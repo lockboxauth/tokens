@@ -5,4 +5,13 @@ go:
   - 1.6
 
 install: true
+before_script: psql -c 'create database travis_ci_test;' -U postgres
+env:
+  - PG_TEST_DB="postgres://postgres:@localhost/travis_ci_test"
 script: go vet $(go list ./... | grep -v /vendor/) && go test $(go list ./... | grep -v /vendor/)
+
+services:
+  - postgresql
+
+addons:
+  postgresql: "9.3"

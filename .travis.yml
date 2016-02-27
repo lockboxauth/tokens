@@ -3,3 +3,5 @@ go_import_path: darlinggo.co/tokens
 
 go:
   - 1.6
+
+install: true

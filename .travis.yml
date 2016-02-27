@@ -5,3 +5,4 @@ go:
   - 1.6
 
 install: true
+script: go vet $(go list ./... | grep -v /vendor/) && go test $(go list ./... | grep -v /vendor/)

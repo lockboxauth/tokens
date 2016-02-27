@@ -7,7 +7,7 @@ go:
 install: true
 before_script: psql -c 'create database travis_ci_test;' -U postgres
 env:
-  - PG_TEST_DB="postgres://postgres:@localhost/travis_ci_test"
+  - PG_TEST_DB="postgres://postgres:@localhost/travis_ci_test?sslmode=disable"
 script: go vet $(go list ./... | grep -v /vendor/) && go test $(go list ./... | grep -v /vendor/)
 
 services:

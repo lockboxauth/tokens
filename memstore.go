@@ -61,8 +61,6 @@ func (m *Memstore) UpdateTokens(ctx context.Context, change RefreshTokenChange) 
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	var toUpdate []RefreshToken
-
 	for val, t := range m.tokens {
 		if change.ID != "" && change.ID != val {
 			continue

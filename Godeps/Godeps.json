@@ -1,0 +1,57 @@
+{
+	"ImportPath": "darlinggo.co/tokens",
+	"GoVersion": "go1.6",
+	"Packages": [
+		"."
+	],
+	"Deps": [
+		{
+			"ImportPath": "code.secondbit.org/pqarrays.hg",
+			"Comment": "null-3",
+			"Rev": "'9a415db0346a9c758455b735bc5135d8a030e6a2'"
+		},
+		{
+			"ImportPath": "code.secondbit.org/uuid.hg",
+			"Comment": "null-8",
+			"Rev": "'15ee0cb56e65a4d866745e413efc20114d691862'"
+		},
+		{
+			"ImportPath": "github.com/lib/pq",
+			"Comment": "go1.0-cutoff-63-g11fc39a",
+			"Rev": "11fc39a580a008f1f39bb3d11d984fb34ed778d9"
+		},
+		{
+			"ImportPath": "github.com/mattes/migrate/driver",
+			"Comment": "v1.2.0-69-gbd05d62",
+			"Rev": "bd05d6207339ba9942e8c2973d959fb18eede898"
+		},
+		{
+			"ImportPath": "github.com/mattes/migrate/file",
+			"Comment": "v1.2.0-69-gbd05d62",
+			"Rev": "bd05d6207339ba9942e8c2973d959fb18eede898"
+		},
+		{
+			"ImportPath": "github.com/mattes/migrate/migrate",
+			"Comment": "v1.2.0-69-gbd05d62",
+			"Rev": "bd05d6207339ba9942e8c2973d959fb18eede898"
+		},
+		{
+			"ImportPath": "github.com/mattes/migrate/pipe",
+			"Comment": "v1.2.0-69-gbd05d62",
+			"Rev": "bd05d6207339ba9942e8c2973d959fb18eede898"
+		},
+		{
+			"ImportPath": "github.com/pborman/uuid",
+			"Comment": "v1.0-11-gc55201b",
+			"Rev": "c55201b036063326c5b1b89ccfe45a184973d073"
+		},
+		{
+			"ImportPath": "github.com/secondbit/pan",
+			"Rev": "680707ad0cd640bcb8741a3debef012ad9bfed5b"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "21af302bb52737bcf1e6ce0128ec5932bf0d8ae9"
+		}
+	]
+}

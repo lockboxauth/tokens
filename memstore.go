@@ -5,8 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"code.secondbit.org/uuid.hg"
-
 	"golang.org/x/net/context"
 )
 
@@ -65,10 +63,10 @@ func (m *Memstore) UpdateTokens(ctx context.Context, change RefreshTokenChange) 
 		if change.ID != "" && change.ID != val {
 			continue
 		}
-		if !change.ProfileID.IsZero() && !change.ProfileID.Equal(t.ProfileID) {
+		if change.ProfileID != "" && change.ProfileID != t.ProfileID {
 			continue
 		}
-		if !change.ClientID.IsZero() && !change.ClientID.Equal(t.ClientID) {
+		if change.ClientID != "" && change.ClientID != t.ClientID {
 			continue
 		}
 		t = ApplyChange(t, change)
@@ -83,14 +81,14 @@ func (m *Memstore) UpdateTokens(ctx context.Context, change RefreshTokenChange) 
 // If `before` is non-empty, only RefreshTokens with a CreatedAt property that is before `before`
 // will be returned. RefreshTokens will be sorted by their CreatedAt property, with the most recent
 // coming first.
-func (m *Memstore) GetTokensByProfileID(ctx context.Context, profileID uuid.ID, since, before time.Time) ([]RefreshToken, error) {
+func (m *Memstore) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	var tokens []RefreshToken
 
 	for _, t := range m.tokens {
-		if !t.ProfileID.Equal(profileID) {
+		if t.ProfileID != profileID {
 			continue
 		}
 		if !before.IsZero() && !t.CreatedAt.Before(before) {

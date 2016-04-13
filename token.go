@@ -9,8 +9,9 @@ import (
 	"golang.org/x/net/context"
 
 	"code.secondbit.org/pqarrays.hg"
-	"code.secondbit.org/uuid.hg"
 )
+
+type storerCtxKeyType struct{}
 
 const (
 	// NumTokenResults is the number of Tokens to retrieve when listing Tokens.
@@ -22,16 +23,21 @@ var (
 	ErrTokenNotFound = errors.New("token not found")
 	// ErrTokenAlreadyExists is returned when a Token is created, but its ID already exists in the Storer.
 	ErrTokenAlreadyExists = errors.New("token already exists")
+
+	ErrStorerKeyEmpty     = errors.New("no Storer set in context")
+	ErrStorerKeyNotStorer = errors.New("value of Storer key in context is not a Storer")
+
+	storerCtxKey = storerCtxKeyType{}
 )
 
 // RefreshToken represents a refresh token that can be used to obtain a new access token.
 type RefreshToken struct {
-	ID          string
+	ID          string `datastore:"-"`
 	CreatedAt   time.Time
 	CreatedFrom string
 	Scopes      pqarrays.StringArray
-	ProfileID   uuid.ID
-	ClientID    uuid.ID
+	ProfileID   string
+	ClientID    string
 	Revoked     bool
 	Used        bool
 }
@@ -44,8 +50,8 @@ type RefreshToken struct {
 // the property won't be updated.
 type RefreshTokenChange struct {
 	ID        string
-	ProfileID uuid.ID
-	ClientID  uuid.ID
+	ProfileID string
+	ClientID  string
 
 	Revoked *bool
 	Used    *bool
@@ -75,7 +81,7 @@ type Storer interface {
 	GetToken(ctx context.Context, token string) (RefreshToken, error)
 	CreateToken(ctx context.Context, token RefreshToken) error
 	UpdateTokens(ctx context.Context, change RefreshTokenChange) error
-	GetTokensByProfileID(ctx context.Context, profileID uuid.ID, since, before time.Time) ([]RefreshToken, error)
+	GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error)
 }
 
 // GenerateTokenID returns a cryptographically random ID for a RefreshToken. If it can't read from the source
@@ -107,4 +113,20 @@ func (r RefreshTokensByCreatedAt) Len() int {
 // Swap puts the RefreshToken in position `i` in position `j`, and the RefreshToken in position `j` in position `i`.
 func (r RefreshTokensByCreatedAt) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
+}
+
+func GetStorer(ctx context.Context) (Storer, error) {
+	val := ctx.Value(storerCtxKey)
+	if val == nil {
+		return nil, ErrStorerKeyEmpty
+	}
+	storer, ok := val.(Storer)
+	if !ok {
+		return nil, ErrStorerKeyNotStorer
+	}
+	return storer, nil
+}
+
+func SetStorer(ctx context.Context, storer Storer) context.Context {
+	return context.WithValue(ctx, storerCtxKey, storer)
 }

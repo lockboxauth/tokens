@@ -16,7 +16,7 @@ const (
 )
 
 type StorerFactory interface {
-	NewStorer(ctx context.Context) (Storer, error)
+	NewStorer(ctx context.Context) (context.Context, Storer, error)
 	TeardownStorer(ctx context.Context, storer Storer) error
 }
 
@@ -40,10 +40,10 @@ func compareRefreshTokens(token1, token2 RefreshToken) (success bool, field stri
 			return false, "Scopes", token1.Scopes, token2.Scopes
 		}
 	}
-	if !token1.ProfileID.Equal(token2.ProfileID) {
+	if token1.ProfileID != token2.ProfileID {
 		return false, "ProfileID", token1.ProfileID, token2.ProfileID
 	}
-	if !token1.ClientID.Equal(token2.ClientID) {
+	if token1.ClientID != token2.ClientID {
 		return false, "ClientID", token1.ClientID, token2.ClientID
 	}
 	if token1.Revoked != token2.Revoked {
@@ -59,7 +59,7 @@ func TestCreateAndGetToken(t *testing.T) {
 	t.Parallel()
 	for _, factory := range storerFactories {
 		ctx := context.Background()
-		storer, err := factory.NewStorer(ctx)
+		ctx, storer, err := factory.NewStorer(ctx)
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
@@ -80,8 +80,8 @@ func TestCreateAndGetToken(t *testing.T) {
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
 			Scopes:      []string{"https://scopes.darlinggo.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.darlinggo.co/profiles/view:me"},
-			ProfileID:   uuid.NewID(),
-			ClientID:    uuid.NewID(),
+			ProfileID:   uuid.NewID().String(),
+			ClientID:    uuid.NewID().String(),
 			Revoked:     false,
 			Used:        true,
 		}
@@ -106,7 +106,7 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 	t.Parallel()
 	for _, factory := range storerFactories {
 		ctx := context.Background()
-		storer, err := factory.NewStorer(ctx)
+		ctx, storer, err := factory.NewStorer(ctx)
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
@@ -127,8 +127,8 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
 			Scopes:      []string{"https://scopes.darlinggo.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.darlinggo.co/profiles/view:me"},
-			ProfileID:   uuid.NewID(),
-			ClientID:    uuid.NewID(),
+			ProfileID:   uuid.NewID().String(),
+			ClientID:    uuid.NewID().String(),
 			Revoked:     false,
 			Used:        true,
 		}
@@ -149,7 +149,7 @@ func TestGetTokenErrTokenNotFound(t *testing.T) {
 	t.Parallel()
 	for _, factory := range storerFactories {
 		ctx := context.Background()
-		storer, err := factory.NewStorer(ctx)
+		ctx, storer, err := factory.NewStorer(ctx)
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
@@ -175,7 +175,7 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 	t.Parallel()
 	for _, factory := range storerFactories {
 		ctx := context.Background()
-		storer, err := factory.NewStorer(ctx)
+		ctx, storer, err := factory.NewStorer(ctx)
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
@@ -191,8 +191,8 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
 			Scopes:      []string{"https://scopes.darlinggo.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.darlinggo.co/profiles/view:me"},
-			ProfileID:   uuid.NewID(),
-			ClientID:    uuid.NewID(),
+			ProfileID:   uuid.NewID().String(),
+			ClientID:    uuid.NewID().String(),
 			Revoked:     false,
 			Used:        true,
 		}
@@ -243,7 +243,7 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 			}
 			ok, field, expectedVal, resultVal = compareRefreshTokens(expectation, resp)
 			if !ok {
-				t.Errorf("Expected %s of change %d to be %v, got %v from %T\n", field, i, expectedVal, resultVal, storer)
+				t.Errorf("Expected %s of change %d (ID %s) to be %v, got %v from %T\n", field, i, token.ID, expectedVal, resultVal, storer)
 			}
 		}
 	}
@@ -253,7 +253,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 	t.Parallel()
 	for _, factory := range storerFactories {
 		ctx := context.Background()
-		storer, err := factory.NewStorer(ctx)
+		ctx, storer, err := factory.NewStorer(ctx)
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
@@ -264,8 +264,8 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 			}
 		}(ctx, factory, storer)
 
-		user1 := uuid.NewID()
-		user2 := uuid.NewID()
+		user1 := uuid.NewID().String()
+		user2 := uuid.NewID().String()
 
 		tokens := []RefreshToken{
 			{
@@ -274,7 +274,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				CreatedFrom: fmt.Sprintf("test case for %T", storer),
 				Scopes:      []string{"https://scopes.darlinggo.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.darlinggo.co/profiles/view:me"},
 				ProfileID:   user1,
-				ClientID:    uuid.NewID(),
+				ClientID:    uuid.NewID().String(),
 				Revoked:     false,
 				Used:        true,
 			}, {
@@ -282,14 +282,14 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				CreatedFrom: fmt.Sprintf("second test case for %T", storer),
 				Scopes:      []string{"this scope", "that scope"},
 				ProfileID:   user1,
-				ClientID:    uuid.NewID(),
+				ClientID:    uuid.NewID().String(),
 				Revoked:     false,
 				Used:        false,
 			}, {
 				CreatedAt:   time.Now().Add(1 * time.Minute).Round(time.Millisecond),
 				CreatedFrom: fmt.Sprintf("third test case for %T", storer),
 				ProfileID:   user2,
-				ClientID:    uuid.NewID(),
+				ClientID:    uuid.NewID().String(),
 				Revoked:     true,
 				Used:        false,
 			},
@@ -316,6 +316,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 		}
 
 		if len(expectations) != len(results) {
+			t.Logf("%+v\n", expectations)
 			t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
 		}
 
@@ -382,7 +383,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 
 		expectations = []RefreshToken{}
 
-		results, err = storer.GetTokensByProfileID(ctx, uuid.NewID(), time.Time{}, time.Time{})
+		results, err = storer.GetTokensByProfileID(ctx, uuid.NewID().String(), time.Time{}, time.Time{})
 		if err != nil {
 			t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
 		}

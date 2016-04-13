@@ -7,7 +7,6 @@ import (
 	"github.com/lib/pq"
 	"github.com/secondbit/pan"
 
-	"code.secondbit.org/uuid.hg"
 	"golang.org/x/net/context"
 )
 
@@ -100,7 +99,7 @@ func (p Postgres) UpdateTokens(ctx context.Context, change RefreshTokenChange) e
 	return err
 }
 
-func getTokensByProfileIDSQL(ctx context.Context, profileID uuid.ID, since, before time.Time) *pan.Query {
+func getTokensByProfileIDSQL(ctx context.Context, profileID string, since, before time.Time) *pan.Query {
 	var t RefreshToken
 	fields, _ := pan.GetFields(t)
 	query := pan.New(pan.POSTGRES, "SELECT "+pan.QueryList(fields)+" FROM "+pan.GetTableName(t))
@@ -114,7 +113,7 @@ func getTokensByProfileIDSQL(ctx context.Context, profileID uuid.ID, since, befo
 	return query.FlushExpressions(" ")
 }
 
-func (p Postgres) GetTokensByProfileID(ctx context.Context, profileID uuid.ID, since, before time.Time) ([]RefreshToken, error) {
+func (p Postgres) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error) {
 	query := getTokensByProfileIDSQL(ctx, profileID, since, before)
 	rows, err := p.db.Query(query.String(), query.Args...)
 	if err != nil {

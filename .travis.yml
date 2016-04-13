@@ -9,9 +9,7 @@ install: true
 before_script: psql -c 'create database travis_ci_test;' -U postgres
 env:
   - PG_TEST_DB="postgres://postgres:@localhost/travis_ci_test?sslmode=disable"
-  - DATASTORE_TEST_PROJECT="darling-test"
-  - DATASTORE_TEST_AUTH="jwt-from-json"
-  - DATASTORE_TEST_JSON_FILE=".datastore.test.json"
+  - DATASTORE_TEST_PROJECT="darling-test" DATASTORE_TEST_AUTH="jwt-from-json" DATASTORE_TEST_JSON_FILE=".datastore.test.json"
 script:
   - go vet $(go list ./... | grep -v /vendor/)
   - go test -cover $(go list ./... | grep -v /vendor/)

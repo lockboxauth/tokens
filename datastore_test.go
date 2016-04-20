@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strconv"
-	"sync"
+
+	"code.secondbit.org/uuid.hg"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/google"
@@ -21,15 +21,9 @@ func init() {
 }
 
 type DatastoreFactory struct {
-	count int
-	lock  sync.Mutex
 }
 
 func (d *DatastoreFactory) NewStorer(ctx context.Context) (context.Context, Storer, error) {
-	d.lock.Lock()
-	d.count++
-	count := d.count
-	d.lock.Unlock()
 	var opts []cloud.ClientOption
 	datastoreProjectID := os.Getenv("DATASTORE_TEST_PROJECT")
 	switch os.Getenv("DATASTORE_TEST_AUTH") {
@@ -52,7 +46,7 @@ func (d *DatastoreFactory) NewStorer(ctx context.Context) (context.Context, Stor
 	default:
 		return ctx, nil, fmt.Errorf("DATASTORE_TEST_PROJECT must be set to default or jwt-from-json")
 	}
-	newCtx := datastore.WithNamespace(ctx, "tokens_test_"+strconv.Itoa(count))
+	newCtx := datastore.WithNamespace(ctx, "tokens_test_"+uuid.NewID().String())
 	datastore, err := NewDatastore(newCtx, datastoreProjectID, opts...)
 	if err != nil {
 		return ctx, nil, err

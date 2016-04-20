@@ -26,7 +26,7 @@ func newTokenKey(ctx context.Context, id string) *datastore.Key {
 }
 
 func NewDatastore(ctx context.Context, projectID string, opts ...cloud.ClientOption) (Datastore, error) {
-	client, err := datastore.NewClient(ctx, projectID)
+	client, err := datastore.NewClient(ctx, projectID, opts...)
 	if err != nil {
 		return Datastore{}, err
 	}

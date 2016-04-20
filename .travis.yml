@@ -5,6 +5,8 @@ go:
   - 1.6
 before_install:
   - openssl aes-256-cbc -K $encrypted_20a7bbf7f101_key -iv $encrypted_20a7bbf7f101_iv -in .datastore.test.json.enc -out .datastore.test.json -d
+  - ls
+  - sha1sum .datastore.test.json
 install: true
 before_script: psql -c 'create database travis_ci_test;' -U postgres
 env:

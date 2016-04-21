@@ -24,7 +24,10 @@ var (
 	// ErrTokenAlreadyExists is returned when a Token is created, but its ID already exists in the Storer.
 	ErrTokenAlreadyExists = errors.New("token already exists")
 
-	ErrStorerKeyEmpty     = errors.New("no Storer set in context")
+	// ErrStorerKeyEmpty is returned when a context.Context has no value for storerCtxKey.
+	ErrStorerKeyEmpty = errors.New("no Storer set in context")
+	// ErrStorerKeyNotStorer is returned when the stroerCtxKey value in a context.Context does not fulfill
+	// the Storer interface.
 	ErrStorerKeyNotStorer = errors.New("value of Storer key in context is not a Storer")
 
 	storerCtxKey = storerCtxKeyType{}
@@ -95,6 +98,23 @@ func GenerateTokenID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// FillTokenDefaults returns a copy of `token` with all empty properties that have default values, like ID
+// and CreatedAt set to their default values.
+func FillTokenDefaults(token RefreshToken) (RefreshToken, error) {
+	res := token
+	if res.ID == "" {
+		id, err := GenerateTokenID()
+		if err != nil {
+			return res, err
+		}
+		res.ID = id
+	}
+	if res.CreatedAt.IsZero() {
+		res.CreatedAt = time.Now()
+	}
+	return res, nil
+}
+
 // RefreshTokensByCreatedAt represents a slice of RefreshTokens that can be sorted by their CreatedAt property
 // using the sort package.
 type RefreshTokensByCreatedAt []RefreshToken
@@ -115,6 +135,9 @@ func (r RefreshTokensByCreatedAt) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
+// GetStorer returns a Storer from the passed context.Context. If no Storer is set, an ErrStorerKeyEmpty
+// error will be returned. If a Storer is set but does not fill the Storer interface, an ErrStorerKeyNotStorer
+// error will be returned.
 func GetStorer(ctx context.Context) (Storer, error) {
 	val := ctx.Value(storerCtxKey)
 	if val == nil {
@@ -127,6 +150,51 @@ func GetStorer(ctx context.Context) (Storer, error) {
 	return storer, nil
 }
 
+// SetStorer returns a copy of `ctx`, but with its storerCtxKey value set
+// to the passed Storer. This Storer can then be retrieved using GetStorer.
 func SetStorer(ctx context.Context, storer Storer) context.Context {
 	return context.WithValue(ctx, storerCtxKey, storer)
+}
+
+// Create inserts `token` into the Storer associated with `ctx`. If a RefreshToken
+// with the same ID already exists in the Storer, an ErrTokenAlreadyExists error
+// will be returned, and the RefreshToken will not be inserted.
+func Create(ctx context.Context, token RefreshToken) error {
+	storer, err := GetStorer(ctx)
+	if err != nil {
+		return err
+	}
+	err = storer.CreateToken(ctx, token)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Get retrieves the RefreshToken with an ID matching `id` from the Storer associated
+// with `ctx`. If no RefreshToken has that ID, an ErrTokenNotFound error is returned.
+func Get(ctx context.Context, id string) (RefreshToken, error) {
+	storer, err := GetStorer(ctx)
+	if err != nil {
+		return RefreshToken{}, err
+	}
+	token, err := storer.GetToken(ctx, id)
+	if err != nil {
+		return RefreshToken{}, err
+	}
+	return token, nil
+}
+
+// Update applies `change` to all the RefreshTokens in the Storer associated with `ctx`
+// that match the ID, ProfileID, or ClientID constraints of `change`.
+func Update(ctx context.Context, change RefreshTokenChange) error {
+	storer, err := GetStorer(ctx)
+	if err != nil {
+		return err
+	}
+	err = storer.UpdateTokens(ctx, change)
+	if err != nil {
+		return err
+	}
+	return nil
 }

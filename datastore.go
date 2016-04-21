@@ -13,10 +13,13 @@ const (
 	tokenDatastoreKind = "Token"
 )
 
+// Datastore is an implementation of the Storer interface that is production quality
+// and backed by Google Cloud Datastore.
 type Datastore struct {
 	client *datastore.Client
 }
 
+// DatastoreKey returns a *datastore.Key for the RefreshToken.
 func (r RefreshToken) DatastoreKey(ctx context.Context) *datastore.Key {
 	return newTokenKey(ctx, r.ID)
 }
@@ -25,6 +28,7 @@ func newTokenKey(ctx context.Context, id string) *datastore.Key {
 	return datastore.NewKey(ctx, tokenDatastoreKind, id, 0, nil)
 }
 
+// NewDatastore returns an instance of Datastore that is ready to be used as a Storer.
 func NewDatastore(ctx context.Context, projectID string, opts ...cloud.ClientOption) (Datastore, error) {
 	client, err := datastore.NewClient(ctx, projectID, opts...)
 	if err != nil {
@@ -33,6 +37,8 @@ func NewDatastore(ctx context.Context, projectID string, opts ...cloud.ClientOpt
 	return Datastore{client: client}, nil
 }
 
+// GetToken retrieves the RefreshToken with an ID matching `id` from the Datastore. If no
+// RefreshToken has that ID, an ErrTokenNotFound error is returned.
 func (d Datastore) GetToken(ctx context.Context, id string) (RefreshToken, error) {
 	var token RefreshToken
 	err := d.client.Get(ctx, newTokenKey(ctx, id), &token)
@@ -46,6 +52,9 @@ func (d Datastore) GetToken(ctx context.Context, id string) (RefreshToken, error
 	return token, nil
 }
 
+// CreateToken inserts the passed RefreshToken into the Datastore. If a RefreshToken
+// with the same ID already exists in the Datastore, an ErrTokenAlreadyExists error
+// will be returned, and the RefreshToken will not be inserted.
 func (d Datastore) CreateToken(ctx context.Context, token RefreshToken) error {
 	tx, err := d.client.NewTransaction(ctx)
 	if err != nil {
@@ -67,6 +76,8 @@ func (d Datastore) CreateToken(ctx context.Context, token RefreshToken) error {
 	return nil
 }
 
+// UpdateTokens applies `change` to all the RefreshTokens in the Datastore that match the
+// ID, ProfileID, or ClientID constraints of `change`.
 func (d Datastore) UpdateTokens(ctx context.Context, change RefreshTokenChange) error {
 	if change.IsEmpty() {
 		return nil
@@ -143,6 +154,12 @@ func (d Datastore) UpdateTokens(ctx context.Context, change RefreshTokenChange) 
 	return nil
 }
 
+// GetTokensByProfileID retrieves up to NumTokenResults RefreshTokens from the Datastore.
+// Only RefreshTokens with a ProfileID property matching `profileID` will be returned. If
+// `since` is non-empty, only RefreshTokens with a CreatedAt property that is after `since`
+// will be returned. If `before` is non-empty, only RefreshTokens with a CreatedAt property
+// that is before `before` will be returned. RefreshTokens will be sorted by their CreatedAt
+// property, with the most recent coming first.
 func (d Datastore) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error) {
 	query := datastore.NewQuery(tokenDatastoreKind).Filter("ProfileID =", profileID)
 	if !since.IsZero() {

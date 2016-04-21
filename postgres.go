@@ -10,10 +10,13 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Postgres is an implementation of the Storer interface that is production quality
+// and backed by a PostgreSQL database.
 type Postgres struct {
 	db *sql.DB
 }
 
+// NewPostgres returns an instance of Postgres that is ready to be used as a Storer.
 func NewPostgres(ctx context.Context, conn string) (Postgres, error) {
 	db, err := sql.Open("postgres", conn)
 	if err != nil {
@@ -22,6 +25,8 @@ func NewPostgres(ctx context.Context, conn string) (Postgres, error) {
 	return Postgres{db: db}, nil
 }
 
+// GetSQLTableName returns the name of the PostgreSQL table RefreshTokens will be stored
+// in. It is required for use with pan.
 func (t RefreshToken) GetSQLTableName() string {
 	return "tokens"
 }
@@ -35,6 +40,8 @@ func getTokenSQL(ctx context.Context, token string) *pan.Query {
 	return query.FlushExpressions(" ")
 }
 
+// GetToken retrieves the RefreshToken with an ID matching `token` from Postgres. If no
+// RefreshToken has that ID, an ErrTokenNotFound error is returned.
 func (p Postgres) GetToken(ctx context.Context, token string) (RefreshToken, error) {
 	query := getTokenSQL(ctx, token)
 	rows, err := p.db.Query(query.String(), query.Args...)
@@ -68,6 +75,9 @@ func createTokenSQL(token RefreshToken) *pan.Query {
 	return query.FlushExpressions(" ")
 }
 
+// CreateToken inserts the passed RefreshToken into Postgres. If a RefreshToken
+// with the same ID already exists in Postgres, an ErrTokenAlreadyExists error
+// will be returned, and the RefreshToken will not be inserted.
 func (p Postgres) CreateToken(ctx context.Context, token RefreshToken) error {
 	query := createTokenSQL(token)
 	_, err := p.db.Exec(query.String(), query.Args...)
@@ -90,6 +100,8 @@ func updateTokensSQL(ctx context.Context, change RefreshTokenChange) *pan.Query 
 	return query.FlushExpressions(" AND ")
 }
 
+// UpdateTokens applies `change` to all the RefreshTokens in Postgres that match the ID,
+// ProfileID, or ClientID constraints of `change`.
 func (p Postgres) UpdateTokens(ctx context.Context, change RefreshTokenChange) error {
 	if change.IsEmpty() {
 		return nil
@@ -113,6 +125,12 @@ func getTokensByProfileIDSQL(ctx context.Context, profileID string, since, befor
 	return query.FlushExpressions(" ")
 }
 
+// GetTokensByProfileID retrieves up to NumTokenResults RefreshTokens from Postgres. Only
+// RefreshTokens with a ProfileID property matching `profileID` will be returned. If `since`
+// is non-empty, only RefreshTokens with a CreatedAt property that is after `since` will be
+// returned. If `before` is non-empty, only RefreshTokens with a CreatedAt property that is
+// before `before` will be returned. RefreshTokens will be sorted by their CreatedAt property,
+// with the most recent coming first.
 func (p Postgres) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error) {
 	query := getTokensByProfileIDSQL(ctx, profileID, since, before)
 	rows, err := p.db.Query(query.String(), query.Args...)

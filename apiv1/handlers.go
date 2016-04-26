@@ -5,8 +5,8 @@ import (
 
 	"darlinggo.co/tokens"
 
-	"code.secondbit.org/api.hg"
 	"code.secondbit.org/trout.hg"
+	"darlinggo.co/api"
 	"golang.org/x/net/context"
 )
 
@@ -26,8 +26,12 @@ func handleInsertToken(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
 		return
 	}
+	// BUG(paddy): need to throw error if createdFrom empty
+	// BUG(paddy): need to throw error if profileID empty
+	// BUG(paddy): need to throw error if clientID empty
 	err = tokens.Create(ctx, token)
 	if err != nil {
+		// BUG(paddy): need to throw error if token with same ID already exists
 		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
 		return
 	}

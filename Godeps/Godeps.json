@@ -12,11 +12,6 @@
 			"Rev": "'75cd24fc2f2c2a2088577d12123ddee5f54e0675'"
 		},
 		{
-			"ImportPath": "code.secondbit.org/api.hg",
-			"Comment": "null-3",
-			"Rev": "'9b954c219259c11ca1a78b3a9167cbeefd572cb3'"
-		},
-		{
 			"ImportPath": "code.secondbit.org/pqarrays.hg",
 			"Comment": "null-3",
 			"Rev": "'9a415db0346a9c758455b735bc5135d8a030e6a2'"
@@ -30,6 +25,10 @@
 			"ImportPath": "code.secondbit.org/uuid.hg",
 			"Comment": "null-8",
 			"Rev": "'15ee0cb56e65a4d866745e413efc20114d691862'"
+		},
+		{
+			"ImportPath": "darlinggo.co/api",
+			"Rev": "52667761d23e1ce0b2751dd86a113751b5905e8d"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
@@ -46,6 +45,14 @@
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/wrappers",
 			"Rev": "dda510ac0fd43b39770f22ac6260eb91d377bce3"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/errwrap",
+			"Rev": "7554cd9344cec97297fa6649b055a8c98c2a1e55"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/go-multierror",
+			"Rev": "d30f09973e19c1dfcd120b2d9c4f168e68d6b5d5"
 		},
 		{
 			"ImportPath": "github.com/lib/pq",

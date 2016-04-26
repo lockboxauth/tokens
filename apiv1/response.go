@@ -1,6 +1,6 @@
 package apiv1
 
-import "code.secondbit.org/api.hg"
+import "darlinggo.co/api"
 
 // Response is a global response object; it supplies the format all
 // HTTP responses should be returned in.

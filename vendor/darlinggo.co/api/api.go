@@ -3,10 +3,13 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sort"
 	"strings"
+
+	"github.com/hashicorp/go-multierror"
 
 	"bitbucket.org/ww/goautoneg"
 
@@ -42,6 +45,16 @@ type RequestError struct {
 	Field  string `json:"field,omitempty"`
 	Param  string `json:"param,omitempty"`
 	Header string `json:"header,omitempty"`
+}
+
+type UnhandledRequestError RequestError
+
+func (u UnhandledRequestError) Error() string {
+	return fmt.Sprintf("unhandled RequestError %+v", u)
+}
+
+func (u UnhandledRequestError) RequestError() RequestError {
+	return RequestError(u)
 }
 
 type ContextHandler func(context.Context, http.ResponseWriter, *http.Request)
@@ -138,4 +151,82 @@ func AuthUser(r *http.Request) (uuid.ID, error) {
 		return nil, ErrUserIDNotSet
 	}
 	return uuid.Parse(rawID)
+}
+
+type ErrorDef struct {
+	Test func(*http.Response, RequestError) bool
+	Err  error
+}
+
+func DecodeErrors(r *http.Response, errs []RequestError, defs []ErrorDef) error {
+	var res *multierror.Error
+	for _, err := range errs {
+		var handled bool
+		for _, def := range defs {
+			if def.Test(r, err) {
+				res = multierror.Append(res, def.Err)
+				handled = true
+			}
+		}
+		if !handled {
+			res = multierror.Append(res, UnhandledRequestError(err))
+		}
+	}
+	return res.ErrOrNil()
+}
+
+func ErrorDefCodeFieldSlug(code int, field, slug string) func(*http.Response, RequestError) bool {
+	return func(r *http.Response, err RequestError) bool {
+		if r.Code != code {
+			return false
+		}
+		if err.Field != field {
+			return false
+		}
+		if err.Slug != slug {
+			return false
+		}
+		return true
+	}
+}
+
+func ActOfGodDef(r *http.Response, err RequestError) bool {
+	if r.Code < 500 {
+		return false
+	}
+	if err.Field != "/" && r.Field != "" {
+		return false
+	}
+	if err.Slug != RequestErrActOfGod {
+		return false
+	}
+	return true
+}
+
+func InvalidFormatDef(r *http.Response, err RequestError) bool {
+	if r.Code != 400 {
+		return false
+	}
+	if err.Field != "/" && r.Field != "" {
+		return false
+	}
+	if err.Slug != RequestErrInvalidFormat {
+		return false
+	}
+	return true
+}
+
+func ParamNotFoundDef(param string) func(*http.Response, RequestError) bool {
+	return func(r *http.Response, err RequestError) {
+		if r.Code != 404 {
+			return false
+		}
+		if err.Param != param {
+			return false
+		}
+		if err.Slug != RequestErrNotFound {
+			return false
+		}
+		return true
+	}
 }

@@ -28,7 +28,7 @@
 		},
 		{
 			"ImportPath": "darlinggo.co/api",
-			"Rev": "52667761d23e1ce0b2751dd86a113751b5905e8d"
+			"Rev": "52eccaceb87e905ea43c303f61710f3f17ca0a80"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",

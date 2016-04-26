@@ -172,12 +172,12 @@ func DecodeErrors(r *http.Response, errs []RequestError, defs []ErrorDef) error 
 			res = multierror.Append(res, UnhandledRequestError(err))
 		}
 	}
-	return res.ErrOrNil()
+	return res.ErrorOrNil()
 }
 
 func ErrorDefCodeFieldSlug(code int, field, slug string) func(*http.Response, RequestError) bool {
 	return func(r *http.Response, err RequestError) bool {
-		if r.Code != code {
+		if r.StatusCode != code {
 			return false
 		}
 		if err.Field != field {
@@ -191,10 +191,10 @@ func ErrorDefCodeFieldSlug(code int, field, slug string) func(*http.Response, Re
 }
 
 func ActOfGodDef(r *http.Response, err RequestError) bool {
-	if r.Code < 500 {
+	if r.StatusCode < 500 {
 		return false
 	}
-	if err.Field != "/" && r.Field != "" {
+	if err.Field != "/" && err.Field != "" {
 		return false
 	}
 	if err.Slug != RequestErrActOfGod {
@@ -204,10 +204,10 @@ func ActOfGodDef(r *http.Response, err RequestError) bool {
 }
 
 func InvalidFormatDef(r *http.Response, err RequestError) bool {
-	if r.Code != 400 {
+	if r.StatusCode != 400 {
 		return false
 	}
-	if err.Field != "/" && r.Field != "" {
+	if err.Field != "/" && err.Field != "" {
 		return false
 	}
 	if err.Slug != RequestErrInvalidFormat {
@@ -217,8 +217,8 @@ func InvalidFormatDef(r *http.Response, err RequestError) bool {
 }
 
 func ParamNotFoundDef(param string) func(*http.Response, RequestError) bool {
-	return func(r *http.Response, err RequestError) {
-		if r.Code != 404 {
+	return func(r *http.Response, err RequestError) bool {
+		if r.StatusCode != 404 {
 			return false
 		}
 		if err.Param != param {

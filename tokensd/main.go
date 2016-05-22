@@ -10,6 +10,7 @@ import (
 
 	"darlinggo.co/tokens"
 	"darlinggo.co/tokens/apiv1"
+	"darlinggo.co/tokens/version"
 	"golang.org/x/net/context"
 )
 
@@ -45,13 +46,13 @@ func main() {
 	http.Handle("/v1/", v1)
 	http.Handle("/v1", v1)
 
-	version := tokens.Version
-	if version == "undefined" || version == "" {
-		version = "dev"
+	vers := version.Version
+	if vers == "undefined" || vers == "" {
+		vers = "dev"
 	}
-	version = version + " (" + tokens.Hash + ")"
+	vers = vers + " (" + version.Hash + ")"
 
-	log.Printf("tokensd version %s starting on port 0.0.0.0:4001\n", version)
+	log.Printf("tokensd version %s starting on port 0.0.0.0:4001\n", vers)
 	err = http.ListenAndServe("0.0.0.0:4001", nil)
 	if err != nil {
 		log.Printf("Error listening on port 0.0.0.0:4001: %+v\n", err)

@@ -3,16 +3,16 @@ go_import_path: darlinggo.co/tokens
 
 go:
   - 1.6
-before_install:
-  - openssl aes-256-cbc -K $encrypted_20a7bbf7f101_key -iv $encrypted_20a7bbf7f101_iv -in .datastore.test.json.enc -out .datastore.test.json -d
-install: true
-before_script: psql -c 'create database travis_ci_test;' -U postgres
+before_script: 
+  - psql -c 'create database travis_ci_test;' -U postgres
+  - go get -u github.com/paddyforan/combinedcoverage
+  - go get -u github.com/wadey/gocovmerge
 env:
   - PG_TEST_DB="postgres://postgres:@localhost/travis_ci_test?sslmode=disable"
-  - DATASTORE_TEST_PROJECT="darling-test" DATASTORE_TEST_AUTH="jwt-from-json" DATASTORE_TEST_JSON_FILE=".datastore.test.json"
 script:
   - go vet $(go list ./... | grep -v /vendor/)
-  - go test -cover $(go list ./... | grep -v /vendor/)
+  - go list ./... | grep -v /vendor/ | xargs -L1 golint
+  - ./coverage.sh
 
 services:
   - postgresql

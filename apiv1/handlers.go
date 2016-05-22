@@ -26,9 +26,20 @@ func handleInsertToken(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
 		return
 	}
-	// BUG(paddy): need to throw error if createdFrom empty
-	// BUG(paddy): need to throw error if profileID empty
-	// BUG(paddy): need to throw error if clientID empty
+	var reqErrs []api.RequestError
+	if token.CreatedFrom == "" {
+		reqErrs = append(reqErrs, api.RequestError{Field: "/createdFrom", Slug: api.RequestErrMissing})
+	}
+	if token.ProfileID == "" {
+		reqErrs = append(reqErrs, api.RequestError{Field: "/profileID", Slug: api.RequestErrMissing})
+	}
+	if token.ClientID == "" {
+		reqErrs = append(reqErrs, api.RequestError{Field: "/clientID", Slug: api.RequestErrMissing})
+	}
+	if len(reqErrs) > 0 {
+		api.Encode(w, r, http.StatusBadRequest, reqErrs)
+		return
+	}
 	err = tokens.Create(ctx, token)
 	if err != nil {
 		// BUG(paddy): need to throw error if token with same ID already exists

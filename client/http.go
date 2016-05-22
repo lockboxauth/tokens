@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"path"
 
 	"darlinggo.co/api"
+	"darlinggo.co/tokens/version"
 
 	"bitbucket.org/ww/goautoneg"
 
@@ -71,7 +73,18 @@ func (a APIManager) buildURL(p string) string {
 
 func (a APIManager) setHeaders(req *http.Request) {
 	req.Header.Set("Accept", "application/json")
-	// TODO(paddy): set other headers?
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Application-ID", a.Application)
+	if version.Version != "" {
+		req.Header.Set("Tokens-Client-Version", version.Version)
+	}
+	if version.Hash != "" {
+		req.Header.Set("Tokens-Client-Hash", version.Hash)
+	}
+	hostname, err := os.Hostname()
+	if err == nil {
+		req.Header.Set("Hostname", hostname)
+	}
 }
 
 // NewAPIManager returns an APIManager instance that's ready to be used

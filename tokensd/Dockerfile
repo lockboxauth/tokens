@@ -1,10 +1,9 @@
 FROM busybox
 
-ADD tokensd /bin/tokensd/tokensd
-ADD ca-certificates.crt /etc/ssl/certs/
-
-WORKDIR /bin/tokensd
+COPY ./tokensd /tokensd
+COPY ./sql    /sql
+COPY ./ca-certificates.crt /etc/ssl/certs/
 
 EXPOSE 4001
 
-CMD /bin/tokensd
+CMD ["/tokensd"]

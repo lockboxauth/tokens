@@ -2,4 +2,6 @@
 COMMIT=$(git rev-parse --short HEAD)
 TAG=$(git name-rev --tags --name-only $COMMIT)
 
-GOOS=$GOOS GOARCH=$GOARCH go build -o ./tokensd/tokensd -ldflags "-X darlinggo.co/tokens.Version=${TAG} -X darlinggo.co/tokens.Hash=${COMMIT}" ./tokensd
+CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH go build -o ./tokensd/tokensd -ldflags "-X darlinggo.co/tokens.Version=${TAG} -X darlinggo.co/tokens.Hash=${COMMIT}" ./tokensd
+rm -rf ./tokensd/sql
+cp -r ./sql ./tokensd/sql

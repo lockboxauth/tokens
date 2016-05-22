@@ -1,3 +1,4 @@
 cover.out
 .datastore.test.json
 tokensd/tokensd
+tokensd/sql

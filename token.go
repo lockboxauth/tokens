@@ -2,13 +2,17 @@ package tokens
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"time"
 
+	"darlinggo.co/hash"
+
 	"golang.org/x/net/context"
 
 	"code.secondbit.org/pqarrays.hg"
+	"code.secondbit.org/uuid.hg"
 )
 
 type storerCtxKeyType struct{}
@@ -23,6 +27,9 @@ var (
 	ErrTokenNotFound = errors.New("token not found")
 	// ErrTokenAlreadyExists is returned when a Token is created, but its ID already exists in the Storer.
 	ErrTokenAlreadyExists = errors.New("token already exists")
+	// ErrTokenHashAlreadyExists is returned when the combination of a Token's Hash, HashSalt, and
+	// HashIterations properties all exists in the database.
+	ErrTokenHashAlreadyExists = errors.New("token hash, salt, and iteration combination already exists")
 
 	// ErrStorerKeyEmpty is returned when a context.Context has no value for storerCtxKey.
 	ErrStorerKeyEmpty = errors.New("no Storer set in context")
@@ -31,18 +38,32 @@ var (
 	ErrStorerKeyNotStorer = errors.New("value of Storer key in context is not a Storer")
 
 	storerCtxKey = storerCtxKeyType{}
+
+	calculatedHashIterations = 0
 )
+
+func init() {
+	iters, err := hash.CalculateIterations(sha256.New)
+	if err != nil {
+		panic(err)
+	}
+	calculatedHashIterations = iters
+}
 
 // RefreshToken represents a refresh token that can be used to obtain a new access token.
 type RefreshToken struct {
-	ID          string `datastore:"-"`
-	CreatedAt   time.Time
-	CreatedFrom string
-	Scopes      pqarrays.StringArray
-	ProfileID   string
-	ClientID    string
-	Revoked     bool
-	Used        bool
+	ID             string `datastore:"-"`
+	Value          string `datastore:"-" sql_column:"-"`
+	Hash           string
+	HashIterations int
+	HashSalt       string
+	CreatedAt      time.Time
+	CreatedFrom    string
+	Scopes         pqarrays.StringArray
+	ProfileID      string
+	ClientID       string
+	Revoked        bool
+	Used           bool
 }
 
 // RefreshTokenChange represents a change to one or more RefreshTokens. If ID is set, only the RefreshToken
@@ -81,15 +102,15 @@ func ApplyChange(t RefreshToken, change RefreshTokenChange) RefreshToken {
 // Storer represents an interface to a persistence method for RefreshTokens. It is used to store, update, and
 // retrieve RefreshTokens.
 type Storer interface {
-	GetToken(ctx context.Context, token string) (RefreshToken, error)
+	GetToken(ctx context.Context, id string) (RefreshToken, error)
 	CreateToken(ctx context.Context, token RefreshToken) error
 	UpdateTokens(ctx context.Context, change RefreshTokenChange) error
 	GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error)
 }
 
-// GenerateTokenID returns a cryptographically random ID for a RefreshToken. If it can't read from the source
-// of randomness, it returns an error.
-func GenerateTokenID() (string, error) {
+// GenerateTokenValue returns a cryptographically random value that can be used as a RefreshToken's Value property.
+// If the cryptographically secure source of randomness can't be read from, an error is returned.
+func GenerateTokenValue() (string, error) {
 	b := make([]byte, 32)
 	_, err := rand.Read(b)
 	if err != nil {
@@ -98,16 +119,45 @@ func GenerateTokenID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// GenerateTokenHash returns a cryptographically secure hash for the passed value, using the specified number of
+// iterations to generate the hash. hash.CalculateIterations is a good way to arrive at this number for any given
+// machine. It returns the hash and the salt used to generate the hash. The salt is a set of cryptographically
+// secure random bytes; if the source of cryptographic randomness can't be read from, an error is returned.
+func GenerateTokenHash(value string, iters int) (string, string, error) {
+	if iters == 0 {
+		return "", "", errors.New("hash iterations set to 0, refusing to generate hash")
+	}
+	hashBytes, saltBytes, err := hash.Create(sha256.New, iters, []byte(value))
+	if err != nil {
+		return "", "", err
+	}
+	return hex.EncodeToString(hashBytes), hex.EncodeToString(saltBytes), nil
+}
+
 // FillTokenDefaults returns a copy of `token` with all empty properties that have default values, like ID
 // and CreatedAt set to their default values.
 func FillTokenDefaults(token RefreshToken) (RefreshToken, error) {
 	res := token
 	if res.ID == "" {
-		id, err := GenerateTokenID()
+		res.ID = uuid.NewID().String()
+	}
+	var valueChanged bool
+	if res.Value == "" {
+		value, err := GenerateTokenValue()
 		if err != nil {
 			return res, err
 		}
-		res.ID = id
+		res.Value = value
+		valueChanged = true
+	}
+	if res.Hash == "" || res.HashSalt == "" || res.HashIterations == 0 || valueChanged {
+		hash, salt, err := GenerateTokenHash(res.Value, calculatedHashIterations)
+		if err != nil {
+			return res, err
+		}
+		res.HashSalt = salt
+		res.Hash = hash
+		res.HashIterations = calculatedHashIterations
 	}
 	if res.CreatedAt.IsZero() {
 		res.CreatedAt = time.Now()

@@ -26,6 +26,18 @@ func compareRefreshTokens(token1, token2 RefreshToken) (success bool, field stri
 	if token1.ID != token2.ID {
 		return false, "ID", token1.ID, token2.ID
 	}
+	if token1.Value != token2.Value {
+		return false, "Value", token1.Value, token2.Value
+	}
+	if token1.Hash != token2.Hash {
+		return false, "Hash", token1.Hash, token2.Hash
+	}
+	if token1.HashSalt != token2.HashSalt {
+		return false, "HashSalt", token1.HashSalt, token2.HashSalt
+	}
+	if token1.HashIterations != token2.HashIterations {
+		return false, "HashIterations", token1.HashIterations, token2.HashIterations
+	}
 	if !token1.CreatedAt.Equal(token2.CreatedAt) {
 		return false, "CreatedAt", token1.CreatedAt, token2.CreatedAt
 	}
@@ -70,12 +82,20 @@ func TestCreateAndGetToken(t *testing.T) {
 			}
 		}(ctx, factory, storer)
 
-		id, err := GenerateTokenID()
+		value, err := GenerateTokenValue()
 		if err != nil {
-			t.Errorf("Error generating token ID: %+v\n", err)
+			t.Errorf("Error generating token Value: %+v\n", err)
+		}
+		hash, salt, err := GenerateTokenHash(value, 1)
+		if err != nil {
+			t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
 		}
 		token := RefreshToken{
-			ID: id,
+			ID:             uuid.NewID().String(),
+			Value:          value,
+			Hash:           hash,
+			HashIterations: 1,
+			HashSalt:       salt,
 			// Postgres only stores times to the millisecond, so we have to round it going in
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
@@ -91,10 +111,11 @@ func TestCreateAndGetToken(t *testing.T) {
 			t.Fatalf("Error creating token in %T: %+v\n", storer, err)
 		}
 
-		result, err := storer.GetToken(ctx, id)
+		result, err := storer.GetToken(ctx, token.ID)
 		if err != nil {
 			t.Fatalf("Unexpected error retrieving token from %T: %+v\n", storer, err)
 		}
+		token.Value = ""
 		ok, field, expected, got := compareRefreshTokens(token, result)
 		if !ok {
 			t.Errorf("Expected %s to be %v, got %v from %T\n", field, expected, got, storer)
@@ -117,12 +138,21 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 			}
 		}(ctx, factory, storer)
 
-		id, err := GenerateTokenID()
+		value, err := GenerateTokenValue()
 		if err != nil {
-			t.Errorf("Error generating token ID: %+v\n", err)
+			t.Errorf("Error generating token Value: %+v\n", err)
 		}
+		hash, salt, err := GenerateTokenHash(value, 1)
+		if err != nil {
+			t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
+		}
+
 		token := RefreshToken{
-			ID: id,
+			ID:             uuid.NewID().String(),
+			Value:          value,
+			Hash:           hash,
+			HashSalt:       salt,
+			HashIterations: 1,
 			// Postgres only stores times to the millisecond, so we have to round it going in
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
@@ -138,9 +168,18 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 			t.Fatalf("Error creating token in %T: %+v\n", storer, err)
 		}
 
+		realHash := token.Hash
+		token.Hash = token.Hash[:len(token.Hash)-1] + "z"
 		err = storer.CreateToken(ctx, token)
 		if err != ErrTokenAlreadyExists {
 			t.Errorf("Expected ErrTokenAlreadyExists, %T returned %+v\n", storer, err)
+		}
+
+		token.Hash = realHash
+		token.ID = uuid.NewID().String()
+		err = storer.CreateToken(ctx, token)
+		if err != ErrTokenHashAlreadyExists {
+			t.Errorf("Expected ErrTokenHashAlreadyExists, %T return %+v\n", storer, err)
 		}
 	}
 }
@@ -160,11 +199,7 @@ func TestGetTokenErrTokenNotFound(t *testing.T) {
 			}
 		}(ctx, factory, storer)
 
-		id, err := GenerateTokenID()
-		if err != nil {
-			t.Errorf("Error generating token ID: %+v\n", err)
-		}
-		token, err := storer.GetToken(ctx, id)
+		token, err := storer.GetToken(ctx, uuid.NewID().String())
 		if err != ErrTokenNotFound {
 			t.Errorf("Expected ErrTokenNotFound, %T returned %+v and %+v\n", storer, token, err)
 		}
@@ -201,12 +236,21 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 			var change RefreshTokenChange
 			var revoked, used bool
 
-			id, err := GenerateTokenID()
+			token.ID = uuid.NewID().String()
+			change.ID = token.ID
+
+			value, err := GenerateTokenValue()
 			if err != nil {
-				t.Errorf("Error generating token ID: %+v\n", err)
+				t.Errorf("Error generating token Value: %+v\n", err)
 			}
-			token.ID = id
-			change.ID = id
+			hash, salt, err := GenerateTokenHash(value, 1)
+			if err != nil {
+				t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
+			}
+			token.Value = value
+			token.Hash = hash
+			token.HashSalt = salt
+			token.HashIterations = 1
 
 			expectation := token
 			result := token
@@ -226,6 +270,8 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 			if !ok {
 				t.Errorf("Expected %s of change %d to be %v, got %v after applying RefreshTokenChange %+v\n", field, i, expectedVal, resultVal, change)
 			}
+
+			expectation.Value = ""
 
 			err = storer.CreateToken(ctx, token)
 			if err != nil {
@@ -296,15 +342,26 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 		}
 
 		for pos, token := range tokens {
-			id, err := GenerateTokenID()
+			token.ID = uuid.NewID().String()
+
+			value, err := GenerateTokenValue()
 			if err != nil {
-				t.Fatalf("Error generating id: %+v\n", err)
+				t.Errorf("Error generating token Value: %+v\n", err)
 			}
-			token.ID = id
+			hash, salt, err := GenerateTokenHash(value, 1)
+			if err != nil {
+				t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
+			}
+			token.Value = value
+			token.Hash = hash
+			token.HashSalt = salt
+			token.HashIterations = 1
+
 			err = storer.CreateToken(ctx, token)
 			if err != nil {
 				t.Errorf("Error creating token %+v in %T: %+v\n", token, storer, err)
 			}
+			token.Value = ""
 			tokens[pos] = token
 		}
 

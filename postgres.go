@@ -81,8 +81,12 @@ func createTokenSQL(token RefreshToken) *pan.Query {
 func (p Postgres) CreateToken(ctx context.Context, token RefreshToken) error {
 	query := createTokenSQL(token)
 	_, err := p.db.Exec(query.String(), query.Args...)
-	if e, ok := err.(*pq.Error); ok && e.Constraint == "tokens_pkey" {
-		err = ErrTokenAlreadyExists
+	if e, ok := err.(*pq.Error); ok {
+		if e.Constraint == "tokens_pkey" {
+			err = ErrTokenAlreadyExists
+		} else if e.Constraint == "unique_value" {
+			err = ErrTokenHashAlreadyExists
+		}
 	}
 	return err
 }

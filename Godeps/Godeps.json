@@ -31,6 +31,10 @@
 			"Rev": "52eccaceb87e905ea43c303f61710f3f17ca0a80"
 		},
 		{
+			"ImportPath": "darlinggo.co/hash",
+			"Rev": "3ecb1d8049fdb265593e2dcd2f76636c306906be"
+		},
+		{
 			"ImportPath": "github.com/golang/protobuf/proto",
 			"Rev": "dda510ac0fd43b39770f22ac6260eb91d377bce3"
 		},
@@ -102,6 +106,10 @@
 		{
 			"ImportPath": "github.com/secondbit/pan",
 			"Rev": "680707ad0cd640bcb8741a3debef012ad9bfed5b"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/pbkdf2",
+			"Rev": "5bcd134fee4dd1475da17714aac19c0aa0142e2f"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",

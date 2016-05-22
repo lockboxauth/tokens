@@ -42,7 +42,14 @@ func handleInsertToken(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	}
 	err = tokens.Create(ctx, token)
 	if err != nil {
-		// BUG(paddy): need to throw error if token with same ID already exists
+		if err == tokens.ErrTokenAlreadyExists {
+			api.Encode(w, r, http.StatusBadRequest, []api.RequestError{{Field: "/id", Slug: api.RequestErrConflict}})
+			return
+		}
+		if err == tokens.ErrTokenHashAlreadyExists {
+			api.Encode(w, r, http.StatusBadRequest, []api.RequestError{{Field: "/value", Slug: api.RequestErrConflict}})
+			return
+		}
 		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
 		return
 	}

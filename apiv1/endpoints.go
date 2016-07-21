@@ -3,8 +3,8 @@ package apiv1
 import (
 	"net/http"
 
-	"code.secondbit.org/trout.hg"
 	"darlinggo.co/api"
+	"darlinggo.co/trout"
 	"golang.org/x/net/context"
 )
 

@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	managerCtxKey = "darlinggo.co/tokens/client#Manager"
+	managerCtxKey = "code.impractical.co/tokens/client#Manager"
 )
 
 var (

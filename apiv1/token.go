@@ -3,7 +3,7 @@ package apiv1
 import (
 	"time"
 
-	"darlinggo.co/tokens"
+	"code.impractical.co/tokens"
 
 	"code.secondbit.org/pqarrays.hg"
 )

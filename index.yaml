@@ -1,7 +1,0 @@
-indexes:
-- kind: Token
-  properties:
-  - name: ProfileID
-    direction: asc
-  - name: CreatedAt
-    direction: desc

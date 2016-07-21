@@ -9,7 +9,7 @@ import (
 	"path"
 
 	"darlinggo.co/api"
-	"darlinggo.co/tokens/version"
+	"darlinggo.co/version"
 
 	"bitbucket.org/ww/goautoneg"
 
@@ -26,6 +26,9 @@ var (
 	// ErrInvalidRequestFormat is returned when the server reports it is unable to decode
 	// the request we sent.
 	ErrInvalidRequestFormat = errors.New("invalid request format")
+	// ErrInvalidTokenString is returned when the token string a user is trying to exchange
+	// for a grant is not valid.
+	ErrInvalidTokenString = errors.New("invalid token string")
 )
 
 // UnexpectedNumberOfTokens is a struct used as an error when the client expected a certain
@@ -75,8 +78,8 @@ func (a APIManager) setHeaders(req *http.Request) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Application-ID", a.Application)
-	if version.Version != "" {
-		req.Header.Set("Tokens-Client-Version", version.Version)
+	if version.Tag != "" {
+		req.Header.Set("Tokens-Client-Version", version.Tag)
 	}
 	if version.Hash != "" {
 		req.Header.Set("Tokens-Client-Hash", version.Hash)
@@ -103,8 +106,8 @@ func NewAPIManager(client Doer, baseURL, application string) *APIManager {
 
 // Get retrieves a single Token from the API. If the ID passed can't be
 // found, Get returns an ErrTokenNotFound error.
-func (a *APIManager) Get(ctx context.Context, token string) (Token, error) {
-	req, err := http.NewRequest("GET", a.buildURL("/"+token), nil)
+func (a *APIManager) Get(ctx context.Context, id string) (Token, error) {
+	req, err := http.NewRequest("GET", a.buildURL("/"+id), nil)
 	if err != nil {
 		return Token{}, err
 	}
@@ -132,43 +135,80 @@ func (a *APIManager) Get(ctx context.Context, token string) (Token, error) {
 	return r.Tokens[0], nil
 }
 
-// Insert inserts the passed Token into the service exposed by the API.
-func (a *APIManager) Insert(ctx context.Context, token Token) (string, error) {
+// Validate checks that the encoded Token provided is a valid token, and
+// returns an ErrInvalidTokenString if not.
+func (a *APIManager) Validate(ctx context.Context, token string) error {
+	id, value, err := Break(token)
+	if err != nil {
+		return err
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
-	err := enc.Encode(token)
+	err = enc.Encode(map[string]string{"value": value})
 	if err != nil {
-		return "", err
+		return err
 	}
-	req, err := http.NewRequest("POST", a.buildURL("/"), &buf)
+	req, err := http.NewRequest("POST", a.buildURL("/"+id), nil)
 	if err != nil {
-		return "", err
+		return err
 	}
 	a.setHeaders(req)
 	resp, err := a.doer.Do(req)
 	if err != nil {
-		return "", err
+		return err
 	}
 	var r response
 	err = decode(resp, &r)
 	if err != nil {
-		return "", err
+		return err
+	}
+	err = api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
+		{Test: api.ActOfGodDef, Err: ErrServerError},
+		{Test: api.ErrDefCodeParamSlug(http.StatusBadRequest, "", api.RequestErrInvalidValue), Err: ErrInvalidTokenString},
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Insert inserts the passed Token into the service exposed by the API.
+func (a *APIManager) Insert(ctx context.Context, token Token) (Token, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	err := enc.Encode(token)
+	if err != nil {
+		return Token{}, err
+	}
+	req, err := http.NewRequest("POST", a.buildURL("/"), &buf)
+	if err != nil {
+		return Token{}, err
+	}
+	a.setHeaders(req)
+	resp, err := a.doer.Do(req)
+	if err != nil {
+		return Token{}, err
+	}
+	var r response
+	err = decode(resp, &r)
+	if err != nil {
+		return Token{}, err
 	}
 	err = api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
 		{Test: api.ActOfGodDef, Err: ErrServerError},
 		{Test: api.InvalidFormatDef, Err: ErrInvalidRequestFormat},
 	})
 	if len(r.Tokens) != 1 {
-		return "", ErrUnexpectedNumberOfTokens(r.Tokens)
+		return Token{}, ErrUnexpectedNumberOfTokens(r.Tokens)
 	}
-	return r.Tokens[0].ID, nil
+	return r.Tokens[0], nil
 }
 
 // Revoke marks the Token identified by the passed ID as revoked, usually for
 // security purposes.
-func (a *APIManager) Revoke(ctx context.Context, token string) error {
+func (a *APIManager) Revoke(ctx context.Context, id string) error {
 	buf := bytes.NewBufferString(`{"revoked": true}`)
-	req, err := http.NewRequest("PATCH", a.buildURL("/"+token), buf)
+	req, err := http.NewRequest("PATCH", a.buildURL("/"+id), buf)
 	if err != nil {
 		return err
 	}
@@ -192,9 +232,9 @@ func (a *APIManager) Revoke(ctx context.Context, token string) error {
 
 // Use marks the Token identified by the passed ID as used, signaling that it
 // should not be considered valid in future requests.
-func (a *APIManager) Use(ctx context.Context, token string) error {
+func (a *APIManager) Use(ctx context.Context, id string) error {
 	buf := bytes.NewBufferString(`{"used": true}`)
-	req, err := http.NewRequest("PATCH", a.buildURL("/"+token), buf)
+	req, err := http.NewRequest("PATCH", a.buildURL("/"+id), buf)
 	if err != nil {
 		return err
 	}

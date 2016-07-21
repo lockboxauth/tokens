@@ -99,7 +99,7 @@ func TestCreateAndGetToken(t *testing.T) {
 			// Postgres only stores times to the millisecond, so we have to round it going in
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
-			Scopes:      []string{"https://scopes.darlinggo.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.darlinggo.co/profiles/view:me"},
+			Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
 			ProfileID:   uuid.NewID().String(),
 			ClientID:    uuid.NewID().String(),
 			Revoked:     false,
@@ -156,7 +156,7 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 			// Postgres only stores times to the millisecond, so we have to round it going in
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
-			Scopes:      []string{"https://scopes.darlinggo.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.darlinggo.co/profiles/view:me"},
+			Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
 			ProfileID:   uuid.NewID().String(),
 			ClientID:    uuid.NewID().String(),
 			Revoked:     false,
@@ -225,7 +225,7 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 			// Postgres only stores times to the millisecond, so we have to round it going in
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
-			Scopes:      []string{"https://scopes.darlinggo.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.darlinggo.co/profiles/view:me"},
+			Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
 			ProfileID:   uuid.NewID().String(),
 			ClientID:    uuid.NewID().String(),
 			Revoked:     false,
@@ -318,7 +318,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				// Postgres only stores times to the millisecond, so we have to round it going in
 				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 				CreatedFrom: fmt.Sprintf("test case for %T", storer),
-				Scopes:      []string{"https://scopes.darlinggo.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.darlinggo.co/profiles/view:me"},
+				Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
 				ProfileID:   user1,
 				ClientID:    uuid.NewID().String(),
 				Revoked:     false,

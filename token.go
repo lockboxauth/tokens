@@ -25,6 +25,9 @@ const (
 var (
 	// ErrTokenNotFound is returned when a Token is requested but its ID doesn't exist.
 	ErrTokenNotFound = errors.New("token not found")
+	// ErrInvalidToken is returned when a Token ID and Value are passed to Validate
+	// but do not match a valid Token.
+	ErrInvalidToken = errors.New("invalid token")
 	// ErrTokenAlreadyExists is returned when a Token is created, but its ID already exists in the Storer.
 	ErrTokenAlreadyExists = errors.New("token already exists")
 	// ErrTokenHashAlreadyExists is returned when the combination of a Token's Hash, HashSalt, and
@@ -247,4 +250,30 @@ func Update(ctx context.Context, change RefreshTokenChange) error {
 		return err
 	}
 	return nil
+}
+
+// Validate checks that the token with the given ID has the given value, and returns an
+// ErrInvalidToken if not.
+func Validate(ctx context.Context, id, value string) (RefreshToken, error) {
+	storer, err := GetStorer(ctx)
+	if err != nil {
+		return RefreshToken{}, err
+	}
+	token, err := storer.GetToken(ctx, id)
+	if err != nil {
+		return RefreshToken{}, err
+	}
+	salt, err := hex.DecodeString(token.HashSalt)
+	if err != nil {
+		return RefreshToken{}, err
+	}
+	hashVal, err := hex.DecodeString(token.Hash)
+	if err != nil {
+		return RefreshToken{}, err
+	}
+	candidate := hash.Check(sha256.New, token.HashIterations, []byte(value), salt)
+	if !hash.Compare(candidate, hashVal) {
+		return RefreshToken{}, ErrInvalidToken
+	}
+	return token, nil
 }

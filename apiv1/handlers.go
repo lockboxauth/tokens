@@ -3,10 +3,10 @@ package apiv1
 import (
 	"net/http"
 
-	"darlinggo.co/tokens"
+	"code.impractical.co/tokens"
 
-	"code.secondbit.org/trout.hg"
 	"darlinggo.co/api"
+	"darlinggo.co/trout"
 	"golang.org/x/net/context"
 )
 
@@ -100,5 +100,28 @@ func handlePatchToken(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 	token = tokens.ApplyChange(token, change)
+	api.Encode(w, r, http.StatusOK, Response{Tokens: []RefreshToken{apiToken(token)}})
+}
+
+func handlePostToken(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	var body RefreshToken
+	id := trout.RequestVars(r).Get("id")
+	if id == "" {
+		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrMissing, Param: "{id}"}}})
+		return
+	}
+	err := api.Decode(r, &body)
+	if err != nil {
+		api.Encode(w, r, http.StatusBadRequest, api.InvalidFormatError)
+		return
+	}
+	token, err := tokens.Validate(ctx, id, body.Value)
+	if err == tokens.ErrInvalidToken {
+		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrInvalidValue}}})
+		return
+	} else if err != nil {
+		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
+		return
+	}
 	api.Encode(w, r, http.StatusOK, Response{Tokens: []RefreshToken{apiToken(token)}})
 }

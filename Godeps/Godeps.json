@@ -1,5 +1,5 @@
 {
-	"ImportPath": "darlinggo.co/tokens",
+	"ImportPath": "code.impractical.co/tokens",
 	"GoVersion": "go1.6",
 	"GodepVersion": "v62",
 	"Packages": [
@@ -17,22 +17,25 @@
 			"Rev": "'9a415db0346a9c758455b735bc5135d8a030e6a2'"
 		},
 		{
-			"ImportPath": "code.secondbit.org/trout.hg",
-			"Comment": "null-5",
-			"Rev": "'07a9b501d6b515f04e0b5f9da7eab0a34c45a1af'"
-		},
-		{
 			"ImportPath": "code.secondbit.org/uuid.hg",
 			"Comment": "null-8",
 			"Rev": "'15ee0cb56e65a4d866745e413efc20114d691862'"
 		},
 		{
 			"ImportPath": "darlinggo.co/api",
-			"Rev": "52eccaceb87e905ea43c303f61710f3f17ca0a80"
+			"Rev": "87e2878b792670a7b13ecd94f40ba82dc7b3de60"
 		},
 		{
 			"ImportPath": "darlinggo.co/hash",
 			"Rev": "3ecb1d8049fdb265593e2dcd2f76636c306906be"
+		},
+		{
+			"ImportPath": "darlinggo.co/trout",
+			"Rev": "f0f405e5b13a1f2d6ecf9b1da607dbb6875556f8"
+		},
+		{
+			"ImportPath": "darlinggo.co/version",
+			"Rev": "18538a81ef9aaa907d1af48c005928111aba110d"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/errwrap",

@@ -190,6 +190,21 @@ func ErrorDefCodeFieldSlug(code int, field, slug string) func(*http.Response, Re
 	}
 }
 
+func ErrDefCodeParamSlug(code int, param, slug string) func(*http.Response, RequestError) bool {
+	return func(r *http.Response, err RequestError) bool {
+		if r.StatusCode != code {
+			return false
+		}
+		if err.Param != param {
+			return false
+		}
+		if err.Slug != slug {
+			return false
+		}
+		return true
+	}
+}
+
 func ActOfGodDef(r *http.Response, err RequestError) bool {
 	if r.StatusCode < 500 {
 		return false
@@ -217,16 +232,13 @@ func InvalidFormatDef(r *http.Response, err RequestError) bool {
 }
 
 func ParamNotFoundDef(param string) func(*http.Response, RequestError) bool {
-	return func(r *http.Response, err RequestError) bool {
-		if r.StatusCode != 404 {
-			return false
-		}
-		if err.Param != param {
-			return false
-		}
-		if err.Slug != RequestErrNotFound {
-			return false
-		}
-		return true
-	}
+	return ErrDefCodeParamSlug(404, param, RequestErrNotFound)
+}
+
+func ParamInvalidValueDef(param string) func(*http.Response, RequestError) bool {
+	return ErrDefCodeParamSlug(400, param, RequestErrInvalidValue)
+}
+
+func ParamInvalidFormatDef(param string) func(*http.Response, RequestError) bool {
+	return ErrDefCodeParamSlug(400, param, RequestErrInvalidFormat)
 }

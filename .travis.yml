@@ -1,5 +1,5 @@
 language: go
-go_import_path: darlinggo.co/tokens
+go_import_path: code.impractical.co/tokens
 
 go:
   - 1.6

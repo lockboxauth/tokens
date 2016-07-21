@@ -5,12 +5,13 @@ import (
 	"net/http"
 	"os"
 
+	"darlinggo.co/version"
+
 	_ "github.com/mattes/migrate/driver/postgres"
 	"github.com/mattes/migrate/migrate"
 
-	"darlinggo.co/tokens"
-	"darlinggo.co/tokens/apiv1"
-	"darlinggo.co/tokens/version"
+	"code.impractical.co/tokens"
+	"code.impractical.co/tokens/apiv1"
 	"golang.org/x/net/context"
 )
 
@@ -30,7 +31,7 @@ func main() {
 	}
 	migrations := os.Getenv("PG_MIGRATIONS_DIR")
 	if migrations == "" {
-		migrations = "../sql"
+		migrations = "./sql"
 	}
 	errs, ok := migrate.UpSync(postgres, migrations)
 	if !ok {
@@ -46,7 +47,7 @@ func main() {
 	http.Handle("/v1/", v1)
 	http.Handle("/v1", v1)
 
-	vers := version.Version
+	vers := version.Tag
 	if vers == "undefined" || vers == "" {
 		vers = "dev"
 	}

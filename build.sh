@@ -1,7 +1,12 @@
 #! /bin/bash
-COMMIT=$(git rev-parse --short HEAD)
-TAG=$(git name-rev --tags --name-only $COMMIT)
 
-CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH go build -o ./tokensd/tokensd -ldflags "-X darlinggo.co/tokens/version.Version=${TAG} -X darlinggo.co/tokens/version.Hash=${COMMIT}" ./tokensd
+# set our ldflags to inject version info
+PACKAGE_PREFIX=code.impractical.co/tokens
+source vendor/darlinggo.co/version/ldflags.sh
+
+# build the binary
+CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH go build -o ./tokensd/tokensd -ldflags "${LDFLAGS}" ./tokensd
+
+# remove any old sql migrations and copy in the current ones
 rm -rf ./tokensd/sql
 cp -r ./sql ./tokensd/sql

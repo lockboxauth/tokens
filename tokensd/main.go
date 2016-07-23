@@ -47,6 +47,9 @@ func main() {
 	http.Handle("/v1/", v1)
 	http.Handle("/v1", v1)
 
+	// set up version handler
+	http.Handle("/version", version.Handler)
+
 	vers := version.Tag
 	if vers == "undefined" || vers == "" {
 		vers = "dev"

@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -9,10 +10,8 @@ import (
 
 	"darlinggo.co/hash"
 
-	"golang.org/x/net/context"
-
-	"code.secondbit.org/pqarrays.hg"
-	"code.secondbit.org/uuid.hg"
+	"code.impractical.co/pqarrays"
+	"github.com/pborman/uuid"
 )
 
 type storerCtxKeyType struct{}
@@ -142,7 +141,7 @@ func GenerateTokenHash(value string, iters int) (string, string, error) {
 func FillTokenDefaults(token RefreshToken) (RefreshToken, error) {
 	res := token
 	if res.ID == "" {
-		res.ID = uuid.NewID().String()
+		res.ID = uuid.NewRandom().String()
 	}
 	var valueChanged bool
 	if res.Value == "" {

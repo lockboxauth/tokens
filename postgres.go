@@ -1,13 +1,13 @@
 package tokens
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
-	"github.com/lib/pq"
-	"github.com/secondbit/pan"
+	"darlinggo.co/pan"
 
-	"golang.org/x/net/context"
+	"github.com/lib/pq"
 )
 
 // Postgres is an implementation of the Storer interface that is production quality
@@ -33,18 +33,21 @@ func (t RefreshToken) GetSQLTableName() string {
 
 func getTokenSQL(ctx context.Context, token string) *pan.Query {
 	var t RefreshToken
-	fields, _ := pan.GetFields(t)
-	query := pan.New(pan.POSTGRES, "SELECT "+pan.QueryList(fields)+" FROM "+pan.GetTableName(t))
-	query.IncludeWhere()
-	query.Include(pan.GetUnquotedColumn(t, "ID")+" = ?", token)
-	return query.FlushExpressions(" ")
+	query := pan.New("SELECT " + pan.Columns(t).String() + " FROM " + pan.Table(t))
+	query.Where()
+	query.Comparison(t, "ID", "=", token)
+	return query.Flush(" ")
 }
 
 // GetToken retrieves the RefreshToken with an ID matching `token` from Postgres. If no
 // RefreshToken has that ID, an ErrTokenNotFound error is returned.
 func (p Postgres) GetToken(ctx context.Context, token string) (RefreshToken, error) {
 	query := getTokenSQL(ctx, token)
-	rows, err := p.db.Query(query.String(), query.Args...)
+	queryStr, err := query.PostgreSQLString()
+	if err != nil {
+		return RefreshToken{}, err
+	}
+	rows, err := p.db.Query(queryStr, query.Args()...)
 	if err != nil {
 		return RefreshToken{}, err
 	}
@@ -67,12 +70,8 @@ func (p Postgres) GetToken(ctx context.Context, token string) (RefreshToken, err
 }
 
 func createTokenSQL(token RefreshToken) *pan.Query {
-	fields, values := pan.GetFields(token)
-	query := pan.New(pan.POSTGRES, "INSERT INTO "+pan.GetTableName(token))
-	query.Include("(" + pan.QueryList(fields) + ")")
-	query.Include("VALUES")
-	query.Include("("+pan.VariableList(len(values))+")", values...)
-	return query.FlushExpressions(" ")
+	query := pan.Insert(token)
+	return query.Flush(" ")
 }
 
 // CreateToken inserts the passed RefreshToken into Postgres. If a RefreshToken
@@ -80,7 +79,11 @@ func createTokenSQL(token RefreshToken) *pan.Query {
 // will be returned, and the RefreshToken will not be inserted.
 func (p Postgres) CreateToken(ctx context.Context, token RefreshToken) error {
 	query := createTokenSQL(token)
-	_, err := p.db.Exec(query.String(), query.Args...)
+	queryStr, err := query.PostgreSQLString()
+	if err != nil {
+		return err
+	}
+	_, err = p.db.Exec(queryStr, query.Args()...)
 	if e, ok := err.(*pq.Error); ok {
 		if e.Constraint == "tokens_pkey" {
 			err = ErrTokenAlreadyExists
@@ -93,15 +96,24 @@ func (p Postgres) CreateToken(ctx context.Context, token RefreshToken) error {
 
 func updateTokensSQL(ctx context.Context, change RefreshTokenChange) *pan.Query {
 	var t RefreshToken
-	query := pan.New(pan.POSTGRES, "UPDATE "+pan.GetTableName(t)+" SET ")
-	query.IncludeIfNotNil(pan.GetUnquotedColumn(t, "Revoked")+" = ?", change.Revoked)
-	query.IncludeIfNotNil(pan.GetUnquotedColumn(t, "Used")+" = ?", change.Used)
-	query.FlushExpressions(", ")
-	query.IncludeWhere()
-	query.IncludeIfNotEmpty(pan.GetUnquotedColumn(t, "ID")+" = ?", change.ID)
-	query.IncludeIfNotNil(pan.GetUnquotedColumn(t, "ClientID")+" = ?", change.ClientID)
-	query.IncludeIfNotNil(pan.GetUnquotedColumn(t, "ProfileID")+" = ?", change.ProfileID)
-	return query.FlushExpressions(" AND ")
+	query := pan.New("UPDATE " + pan.Table(t) + " SET ")
+	if change.Revoked != nil {
+		query.Comparison(t, "Revoked", "=", change.Revoked)
+	}
+	if change.Used != nil {
+		query.Comparison(t, "Used", "=", change.Used)
+	}
+	query.Flush(", ").Where()
+	if change.ID != "" {
+		query.Comparison(t, "ID", "=", change.ID)
+	}
+	if change.ClientID != "" {
+		query.Comparison(t, "ClientID", "=", change.ClientID)
+	}
+	if change.ProfileID != "" {
+		query.Comparison(t, "ProfileID", "=", change.ProfileID)
+	}
+	return query.Flush(" AND ")
 }
 
 // UpdateTokens applies `change` to all the RefreshTokens in Postgres that match the ID,
@@ -111,22 +123,29 @@ func (p Postgres) UpdateTokens(ctx context.Context, change RefreshTokenChange) e
 		return nil
 	}
 	query := updateTokensSQL(ctx, change)
-	_, err := p.db.Exec(query.String(), query.Args...)
+	queryStr, err := query.PostgreSQLString()
+	if err != nil {
+		return err
+	}
+	_, err = p.db.Exec(queryStr, query.Args()...)
 	return err
 }
 
 func getTokensByProfileIDSQL(ctx context.Context, profileID string, since, before time.Time) *pan.Query {
 	var t RefreshToken
-	fields, _ := pan.GetFields(t)
-	query := pan.New(pan.POSTGRES, "SELECT "+pan.QueryList(fields)+" FROM "+pan.GetTableName(t))
-	query.IncludeWhere()
-	query.Include(pan.GetUnquotedColumn(t, "ProfileID")+" = ?", profileID)
-	query.IncludeIfNotEmpty(pan.GetUnquotedColumn(t, "CreatedAt")+" < ?", before)
-	query.IncludeIfNotEmpty(pan.GetUnquotedColumn(t, "CreatedAt")+" > ?", since)
-	query.FlushExpressions(" AND ")
-	query.Include("ORDER BY " + pan.GetUnquotedColumn(t, "CreatedAt") + " DESC")
-	query.IncludeLimit(NumTokenResults)
-	return query.FlushExpressions(" ")
+	query := pan.New("SELECT " + pan.Columns(t).String() + " FROM " + pan.Table(t))
+	query.Where()
+	query.Comparison(t, "ProfileID", "=", profileID)
+	if !before.IsZero() {
+		query.Comparison(t, "CreatedAt", "<", before)
+	}
+	if !since.IsZero() {
+		query.Comparison(t, "CreatedAt", ">", since)
+	}
+	query.Flush(" AND ")
+	query.OrderByDesc(pan.Column(t, "CreatedAt"))
+	query.Limit(NumTokenResults)
+	return query.Flush(" ")
 }
 
 // GetTokensByProfileID retrieves up to NumTokenResults RefreshTokens from Postgres. Only
@@ -137,7 +156,11 @@ func getTokensByProfileIDSQL(ctx context.Context, profileID string, since, befor
 // with the most recent coming first.
 func (p Postgres) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error) {
 	query := getTokensByProfileIDSQL(ctx, profileID, since, before)
-	rows, err := p.db.Query(query.String(), query.Args...)
+	queryStr, err := query.PostgreSQLString()
+	if err != nil {
+		return []RefreshToken{}, err
+	}
+	rows, err := p.db.Query(queryStr, query.Args()...)
 	if err != nil {
 		return []RefreshToken{}, err
 	}

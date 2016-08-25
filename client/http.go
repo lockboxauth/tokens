@@ -2,6 +2,7 @@ package tokensClient
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -12,8 +13,6 @@ import (
 	"darlinggo.co/version"
 
 	"bitbucket.org/ww/goautoneg"
-
-	"golang.org/x/net/context"
 )
 
 var (

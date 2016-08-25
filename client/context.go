@@ -1,9 +1,8 @@
 package tokensClient
 
 import (
+	"context"
 	"errors"
-
-	"golang.org/x/net/context"
 )
 
 const (

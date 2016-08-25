@@ -1,12 +1,12 @@
 package tokens
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"code.secondbit.org/uuid.hg"
-	"golang.org/x/net/context"
+	"github.com/pborman/uuid"
 )
 
 const (
@@ -75,50 +75,50 @@ func TestCreateAndGetToken(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
-		defer func(ctx context.Context, factory StorerFactory, storer Storer) {
-			err := factory.TeardownStorer(ctx, storer)
+		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
+			storer, ctx := storer, ctx
+			value, err := GenerateTokenValue()
 			if err != nil {
-				t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
+				t.Errorf("Error generating token Value: %+v\n", err)
 			}
-		}(ctx, factory, storer)
+			hash, salt, err := GenerateTokenHash(value, 1)
+			if err != nil {
+				t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
+			}
+			token := RefreshToken{
+				ID:             uuid.NewRandom().String(),
+				Value:          value,
+				Hash:           hash,
+				HashIterations: 1,
+				HashSalt:       salt,
+				// Postgres only stores times to the millisecond, so we have to round it going in
+				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
+				CreatedFrom: fmt.Sprintf("test case for %T", storer),
+				Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
+				ProfileID:   uuid.NewRandom().String(),
+				ClientID:    uuid.NewRandom().String(),
+				Revoked:     false,
+				Used:        true,
+			}
 
-		value, err := GenerateTokenValue()
-		if err != nil {
-			t.Errorf("Error generating token Value: %+v\n", err)
-		}
-		hash, salt, err := GenerateTokenHash(value, 1)
-		if err != nil {
-			t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
-		}
-		token := RefreshToken{
-			ID:             uuid.NewID().String(),
-			Value:          value,
-			Hash:           hash,
-			HashIterations: 1,
-			HashSalt:       salt,
-			// Postgres only stores times to the millisecond, so we have to round it going in
-			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
-			CreatedFrom: fmt.Sprintf("test case for %T", storer),
-			Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
-			ProfileID:   uuid.NewID().String(),
-			ClientID:    uuid.NewID().String(),
-			Revoked:     false,
-			Used:        true,
-		}
+			err = storer.CreateToken(ctx, token)
+			if err != nil {
+				t.Fatalf("Error creating token: %+v\n", err)
+			}
 
-		err = storer.CreateToken(ctx, token)
+			result, err := storer.GetToken(ctx, token.ID)
+			if err != nil {
+				t.Fatalf("Unexpected error retrieving token: %+v\n", err)
+			}
+			token.Value = ""
+			ok, field, expected, got := compareRefreshTokens(token, result)
+			if !ok {
+				t.Errorf("Expected %s to be %v, got %v\n", field, expected, got)
+			}
+		})
+		err = factory.TeardownStorer(ctx, storer)
 		if err != nil {
-			t.Fatalf("Error creating token in %T: %+v\n", storer, err)
-		}
-
-		result, err := storer.GetToken(ctx, token.ID)
-		if err != nil {
-			t.Fatalf("Unexpected error retrieving token from %T: %+v\n", storer, err)
-		}
-		token.Value = ""
-		ok, field, expected, got := compareRefreshTokens(token, result)
-		if !ok {
-			t.Errorf("Expected %s to be %v, got %v from %T\n", field, expected, got, storer)
+			t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
 		}
 	}
 }
@@ -131,55 +131,56 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
-		defer func(ctx context.Context, factory StorerFactory, storer Storer) {
-			err := factory.TeardownStorer(ctx, storer)
+		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
+			storer, ctx := storer, ctx
+
+			value, err := GenerateTokenValue()
 			if err != nil {
-				t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
+				t.Errorf("Error generating token Value: %+v\n", err)
 			}
-		}(ctx, factory, storer)
+			hash, salt, err := GenerateTokenHash(value, 1)
+			if err != nil {
+				t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
+			}
 
-		value, err := GenerateTokenValue()
+			token := RefreshToken{
+				ID:             uuid.NewRandom().String(),
+				Value:          value,
+				Hash:           hash,
+				HashSalt:       salt,
+				HashIterations: 1,
+				// Postgres only stores times to the millisecond, so we have to round it going in
+				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
+				CreatedFrom: fmt.Sprintf("test case for %T", storer),
+				Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
+				ProfileID:   uuid.NewRandom().String(),
+				ClientID:    uuid.NewRandom().String(),
+				Revoked:     false,
+				Used:        true,
+			}
+
+			err = storer.CreateToken(ctx, token)
+			if err != nil {
+				t.Fatalf("Error creating token in %T: %+v\n", storer, err)
+			}
+
+			realHash := token.Hash
+			token.Hash = token.Hash[:len(token.Hash)-1] + "z"
+			err = storer.CreateToken(ctx, token)
+			if err != ErrTokenAlreadyExists {
+				t.Errorf("Expected ErrTokenAlreadyExists, %T returned %+v\n", storer, err)
+			}
+
+			token.Hash = realHash
+			token.ID = uuid.NewRandom().String()
+			err = storer.CreateToken(ctx, token)
+			if err != ErrTokenHashAlreadyExists {
+				t.Errorf("Expected ErrTokenHashAlreadyExists, %T return %+v\n", storer, err)
+			}
+		})
+		err = factory.TeardownStorer(ctx, storer)
 		if err != nil {
-			t.Errorf("Error generating token Value: %+v\n", err)
-		}
-		hash, salt, err := GenerateTokenHash(value, 1)
-		if err != nil {
-			t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
-		}
-
-		token := RefreshToken{
-			ID:             uuid.NewID().String(),
-			Value:          value,
-			Hash:           hash,
-			HashSalt:       salt,
-			HashIterations: 1,
-			// Postgres only stores times to the millisecond, so we have to round it going in
-			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
-			CreatedFrom: fmt.Sprintf("test case for %T", storer),
-			Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
-			ProfileID:   uuid.NewID().String(),
-			ClientID:    uuid.NewID().String(),
-			Revoked:     false,
-			Used:        true,
-		}
-
-		err = storer.CreateToken(ctx, token)
-		if err != nil {
-			t.Fatalf("Error creating token in %T: %+v\n", storer, err)
-		}
-
-		realHash := token.Hash
-		token.Hash = token.Hash[:len(token.Hash)-1] + "z"
-		err = storer.CreateToken(ctx, token)
-		if err != ErrTokenAlreadyExists {
-			t.Errorf("Expected ErrTokenAlreadyExists, %T returned %+v\n", storer, err)
-		}
-
-		token.Hash = realHash
-		token.ID = uuid.NewID().String()
-		err = storer.CreateToken(ctx, token)
-		if err != ErrTokenHashAlreadyExists {
-			t.Errorf("Expected ErrTokenHashAlreadyExists, %T return %+v\n", storer, err)
+			t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
 		}
 	}
 }
@@ -192,16 +193,17 @@ func TestGetTokenErrTokenNotFound(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
-		defer func(ctx context.Context, factory StorerFactory, storer Storer) {
-			err := factory.TeardownStorer(ctx, storer)
-			if err != nil {
-				t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
-			}
-		}(ctx, factory, storer)
+		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
+			storer, ctx := storer, ctx
 
-		token, err := storer.GetToken(ctx, uuid.NewID().String())
-		if err != ErrTokenNotFound {
-			t.Errorf("Expected ErrTokenNotFound, %T returned %+v and %+v\n", storer, token, err)
+			token, err := storer.GetToken(ctx, uuid.NewRandom().String())
+			if err != ErrTokenNotFound {
+				t.Errorf("Expected ErrTokenNotFound, %T returned %+v and %+v\n", storer, token, err)
+			}
+		})
+		err = factory.TeardownStorer(ctx, storer)
+		if err != nil {
+			t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
 		}
 	}
 }
@@ -214,83 +216,89 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
-		defer func(ctx context.Context, factory StorerFactory, storer Storer) {
-			err := factory.TeardownStorer(ctx, storer)
-			if err != nil {
-				t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
-			}
-		}(ctx, factory, storer)
+		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
+			storer, ctx := storer, ctx
 
-		token := RefreshToken{
-			// Postgres only stores times to the millisecond, so we have to round it going in
-			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
-			CreatedFrom: fmt.Sprintf("test case for %T", storer),
-			Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
-			ProfileID:   uuid.NewID().String(),
-			ClientID:    uuid.NewID().String(),
-			Revoked:     false,
-			Used:        true,
-		}
-
-		for i := 1; i < changeVariations; i++ {
-			var change RefreshTokenChange
-			var revoked, used bool
-
-			token.ID = uuid.NewID().String()
-			change.ID = token.ID
-
-			value, err := GenerateTokenValue()
-			if err != nil {
-				t.Errorf("Error generating token Value: %+v\n", err)
-			}
-			hash, salt, err := GenerateTokenHash(value, 1)
-			if err != nil {
-				t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
-			}
-			token.Value = value
-			token.Hash = hash
-			token.HashSalt = salt
-			token.HashIterations = 1
-
-			expectation := token
-			result := token
-
-			if i&changeRevoked != 0 {
-				revoked = i%2 == 0
-				change.Revoked = &revoked
-				expectation.Revoked = revoked
-			}
-			if i&changeUsed == 0 {
-				used = i%2 != 0
-				change.Used = &used
-				expectation.Used = used
-			}
-			result = ApplyChange(result, change)
-			ok, field, expectedVal, resultVal := compareRefreshTokens(expectation, result)
-			if !ok {
-				t.Errorf("Expected %s of change %d to be %v, got %v after applying RefreshTokenChange %+v\n", field, i, expectedVal, resultVal, change)
+			token := RefreshToken{
+				// Postgres only stores times to the millisecond, so we have to round it going in
+				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
+				CreatedFrom: fmt.Sprintf("test case for %T", storer),
+				Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
+				ProfileID:   uuid.NewRandom().String(),
+				ClientID:    uuid.NewRandom().String(),
+				Revoked:     false,
+				Used:        true,
 			}
 
-			expectation.Value = ""
+			for i := 1; i < changeVariations; i++ {
+				t.Run(fmt.Sprintf("Variation=%d", i), func(t *testing.T) {
+					i := i
+					token := token
+					t.Parallel()
+					var change RefreshTokenChange
+					var revoked, used bool
 
-			err = storer.CreateToken(ctx, token)
-			if err != nil {
-				t.Fatalf("Error creating token in %T: %+v\n", storer, err)
-			}
+					token.ID = uuid.NewRandom().String()
+					change.ID = token.ID
 
-			err = storer.UpdateTokens(ctx, change)
-			if err != nil {
-				t.Fatalf("Error updating token in %T: %+v\n", storer, err)
-			}
+					value, err := GenerateTokenValue()
+					if err != nil {
+						t.Errorf("Error generating token Value: %+v\n", err)
+					}
+					hash, salt, err := GenerateTokenHash(value, 1)
+					if err != nil {
+						t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
+					}
+					token.Value = value
+					token.Hash = hash
+					token.HashSalt = salt
+					token.HashIterations = 1
 
-			resp, err := storer.GetToken(ctx, token.ID)
-			if err != nil {
-				t.Fatalf("Error retrieving token from %T: %+v\n", storer, err)
+					expectation := token
+					result := token
+
+					if i&changeRevoked != 0 {
+						revoked = i%2 == 0
+						change.Revoked = &revoked
+						expectation.Revoked = revoked
+					}
+					if i&changeUsed == 0 {
+						used = i%2 != 0
+						change.Used = &used
+						expectation.Used = used
+					}
+					result = ApplyChange(result, change)
+					ok, field, expectedVal, resultVal := compareRefreshTokens(expectation, result)
+					if !ok {
+						t.Errorf("Expected %s of change %d to be %v, got %v after applying RefreshTokenChange %+v\n", field, i, expectedVal, resultVal, change)
+					}
+
+					expectation.Value = ""
+
+					err = storer.CreateToken(ctx, token)
+					if err != nil {
+						t.Fatalf("Error creating token in %T: %+v\n", storer, err)
+					}
+
+					err = storer.UpdateTokens(ctx, change)
+					if err != nil {
+						t.Fatalf("Error updating token in %T: %+v\n", storer, err)
+					}
+
+					resp, err := storer.GetToken(ctx, token.ID)
+					if err != nil {
+						t.Fatalf("Error retrieving token from %T: %+v\n", storer, err)
+					}
+					ok, field, expectedVal, resultVal = compareRefreshTokens(expectation, resp)
+					if !ok {
+						t.Errorf("Expected %s of change %d (ID %s) to be %v, got %v from %T\n", field, i, token.ID, expectedVal, resultVal, storer)
+					}
+				})
 			}
-			ok, field, expectedVal, resultVal = compareRefreshTokens(expectation, resp)
-			if !ok {
-				t.Errorf("Expected %s of change %d (ID %s) to be %v, got %v from %T\n", field, i, token.ID, expectedVal, resultVal, storer)
-			}
+		})
+		err = factory.TeardownStorer(ctx, storer)
+		if err != nil {
+			t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
 		}
 	}
 }
@@ -303,150 +311,150 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
-		defer func(ctx context.Context, factory StorerFactory, storer Storer) {
-			err := factory.TeardownStorer(ctx, storer)
+		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
+			storer, ctx := storer, ctx
+			user1 := uuid.NewRandom().String()
+			user2 := uuid.NewRandom().String()
+
+			tokens := []RefreshToken{
+				{
+					// Postgres only stores times to the millisecond, so we have to round it going in
+					CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
+					CreatedFrom: fmt.Sprintf("test case for %T", storer),
+					Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
+					ProfileID:   user1,
+					ClientID:    uuid.NewRandom().String(),
+					Revoked:     false,
+					Used:        true,
+				}, {
+					CreatedAt:   time.Now().Add(1 * time.Hour).Round(time.Millisecond),
+					CreatedFrom: fmt.Sprintf("second test case for %T", storer),
+					Scopes:      []string{"this scope", "that scope"},
+					ProfileID:   user1,
+					ClientID:    uuid.NewRandom().String(),
+					Revoked:     false,
+					Used:        false,
+				}, {
+					CreatedAt:   time.Now().Add(1 * time.Minute).Round(time.Millisecond),
+					CreatedFrom: fmt.Sprintf("third test case for %T", storer),
+					ProfileID:   user2,
+					ClientID:    uuid.NewRandom().String(),
+					Revoked:     true,
+					Used:        false,
+				},
+			}
+
+			for pos, token := range tokens {
+				token.ID = uuid.NewRandom().String()
+
+				value, err := GenerateTokenValue()
+				if err != nil {
+					t.Errorf("Error generating token Value: %+v\n", err)
+				}
+				hash, salt, err := GenerateTokenHash(value, 1)
+				if err != nil {
+					t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
+				}
+				token.Value = value
+				token.Hash = hash
+				token.HashSalt = salt
+				token.HashIterations = 1
+
+				err = storer.CreateToken(ctx, token)
+				if err != nil {
+					t.Errorf("Error creating token %+v in %T: %+v\n", token, storer, err)
+				}
+				token.Value = ""
+				tokens[pos] = token
+			}
+
+			expectations := []RefreshToken{tokens[1], tokens[0]}
+
+			results, err := storer.GetTokensByProfileID(ctx, user1, time.Time{}, time.Time{})
 			if err != nil {
-				t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
+				t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
 			}
-		}(ctx, factory, storer)
 
-		user1 := uuid.NewID().String()
-		user2 := uuid.NewID().String()
+			if len(expectations) != len(results) {
+				t.Logf("%+v\n", expectations)
+				t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
+			}
 
-		tokens := []RefreshToken{
-			{
-				// Postgres only stores times to the millisecond, so we have to round it going in
-				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
-				CreatedFrom: fmt.Sprintf("test case for %T", storer),
-				Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
-				ProfileID:   user1,
-				ClientID:    uuid.NewID().String(),
-				Revoked:     false,
-				Used:        true,
-			}, {
-				CreatedAt:   time.Now().Add(1 * time.Hour).Round(time.Millisecond),
-				CreatedFrom: fmt.Sprintf("second test case for %T", storer),
-				Scopes:      []string{"this scope", "that scope"},
-				ProfileID:   user1,
-				ClientID:    uuid.NewID().String(),
-				Revoked:     false,
-				Used:        false,
-			}, {
-				CreatedAt:   time.Now().Add(1 * time.Minute).Round(time.Millisecond),
-				CreatedFrom: fmt.Sprintf("third test case for %T", storer),
-				ProfileID:   user2,
-				ClientID:    uuid.NewID().String(),
-				Revoked:     true,
-				Used:        false,
-			},
-		}
+			for pos, expectation := range expectations {
+				ok, field, exp, res := compareRefreshTokens(expectation, results[pos])
+				if !ok {
+					t.Errorf("Expected %s of token %d to be %v, got %v from %T\n", field, pos, exp, res, storer)
+				}
+			}
 
-		for pos, token := range tokens {
-			token.ID = uuid.NewID().String()
+			expectations = []RefreshToken{tokens[0]}
 
-			value, err := GenerateTokenValue()
+			results, err = storer.GetTokensByProfileID(ctx, user1, time.Time{}, time.Now())
 			if err != nil {
-				t.Errorf("Error generating token Value: %+v\n", err)
+				t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
 			}
-			hash, salt, err := GenerateTokenHash(value, 1)
+
+			if len(expectations) != len(results) {
+				t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
+			}
+
+			for pos, expectation := range expectations {
+				ok, field, exp, res := compareRefreshTokens(expectation, results[pos])
+				if !ok {
+					t.Errorf("Expected %s of token %d to be %v, got %v from %T\n", field, pos, exp, res, storer)
+				}
+			}
+
+			expectations = []RefreshToken{tokens[1]}
+
+			results, err = storer.GetTokensByProfileID(ctx, user1, time.Now(), time.Time{})
 			if err != nil {
-				t.Errorf("Error generating token Hash and HashSalt: %+v\n", err)
+				t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
 			}
-			token.Value = value
-			token.Hash = hash
-			token.HashSalt = salt
-			token.HashIterations = 1
 
-			err = storer.CreateToken(ctx, token)
+			if len(expectations) != len(results) {
+				t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
+			}
+
+			for pos, expectation := range expectations {
+				ok, field, exp, res := compareRefreshTokens(expectation, results[pos])
+				if !ok {
+					t.Errorf("Expected %s of token %d to be %v, got %v from %T\n", field, pos, exp, res, storer)
+				}
+			}
+
+			expectations = []RefreshToken{tokens[2]}
+
+			results, err = storer.GetTokensByProfileID(ctx, user2, time.Time{}, time.Time{})
 			if err != nil {
-				t.Errorf("Error creating token %+v in %T: %+v\n", token, storer, err)
+				t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
 			}
-			token.Value = ""
-			tokens[pos] = token
-		}
 
-		expectations := []RefreshToken{tokens[1], tokens[0]}
-
-		results, err := storer.GetTokensByProfileID(ctx, user1, time.Time{}, time.Time{})
-		if err != nil {
-			t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
-		}
-
-		if len(expectations) != len(results) {
-			t.Logf("%+v\n", expectations)
-			t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
-		}
-
-		for pos, expectation := range expectations {
-			ok, field, exp, res := compareRefreshTokens(expectation, results[pos])
-			if !ok {
-				t.Errorf("Expected %s of token %d to be %v, got %v from %T\n", field, pos, exp, res, storer)
+			if len(expectations) != len(results) {
+				t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
 			}
-		}
 
-		expectations = []RefreshToken{tokens[0]}
-
-		results, err = storer.GetTokensByProfileID(ctx, user1, time.Time{}, time.Now())
-		if err != nil {
-			t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
-		}
-
-		if len(expectations) != len(results) {
-			t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
-		}
-
-		for pos, expectation := range expectations {
-			ok, field, exp, res := compareRefreshTokens(expectation, results[pos])
-			if !ok {
-				t.Errorf("Expected %s of token %d to be %v, got %v from %T\n", field, pos, exp, res, storer)
+			for pos, expectation := range expectations {
+				ok, field, exp, res := compareRefreshTokens(expectation, results[pos])
+				if !ok {
+					t.Errorf("Expected %s of token %d to be %v, got %v from %T\n", field, pos, exp, res, storer)
+				}
 			}
-		}
 
-		expectations = []RefreshToken{tokens[1]}
+			expectations = []RefreshToken{}
 
-		results, err = storer.GetTokensByProfileID(ctx, user1, time.Now(), time.Time{})
-		if err != nil {
-			t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
-		}
-
-		if len(expectations) != len(results) {
-			t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
-		}
-
-		for pos, expectation := range expectations {
-			ok, field, exp, res := compareRefreshTokens(expectation, results[pos])
-			if !ok {
-				t.Errorf("Expected %s of token %d to be %v, got %v from %T\n", field, pos, exp, res, storer)
+			results, err = storer.GetTokensByProfileID(ctx, uuid.NewRandom().String(), time.Time{}, time.Time{})
+			if err != nil {
+				t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
 			}
-		}
 
-		expectations = []RefreshToken{tokens[2]}
-
-		results, err = storer.GetTokensByProfileID(ctx, user2, time.Time{}, time.Time{})
-		if err != nil {
-			t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
-		}
-
-		if len(expectations) != len(results) {
-			t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
-		}
-
-		for pos, expectation := range expectations {
-			ok, field, exp, res := compareRefreshTokens(expectation, results[pos])
-			if !ok {
-				t.Errorf("Expected %s of token %d to be %v, got %v from %T\n", field, pos, exp, res, storer)
+			if len(expectations) != len(results) {
+				t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
 			}
-		}
-
-		expectations = []RefreshToken{}
-
-		results, err = storer.GetTokensByProfileID(ctx, uuid.NewID().String(), time.Time{}, time.Time{})
+		})
+		err = factory.TeardownStorer(ctx, storer)
 		if err != nil {
-			t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
-		}
-
-		if len(expectations) != len(results) {
-			t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
+			t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,9 +14,7 @@ import (
 
 	"bitbucket.org/ww/goautoneg"
 
-	"code.secondbit.org/uuid.hg"
-
-	"golang.org/x/net/context"
+	"github.com/pborman/uuid"
 )
 
 const (
@@ -38,6 +37,7 @@ var (
 	Encoders = []string{"application/json"}
 
 	ErrUserIDNotSet = errors.New("user ID not set")
+	ErrInvalidUUID  = errors.New("not a valid uuid")
 )
 
 type RequestError struct {
@@ -145,12 +145,16 @@ func GetScopes(r *http.Request) []string {
 	return scopes
 }
 
-func AuthUser(r *http.Request) (uuid.ID, error) {
+func AuthUser(r *http.Request) (uuid.UUID, error) {
 	rawID := r.Header.Get("User-ID")
 	if rawID == "" {
 		return nil, ErrUserIDNotSet
 	}
-	return uuid.Parse(rawID)
+	id := uuid.Parse(rawID)
+	if id == nil {
+		return nil, ErrInvalidUUID
+	}
+	return id, nil
 }
 
 type ErrorDef struct {

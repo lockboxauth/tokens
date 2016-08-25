@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -12,7 +13,6 @@ import (
 
 	"code.impractical.co/tokens"
 	"code.impractical.co/tokens/apiv1"
-	"golang.org/x/net/context"
 )
 
 func main() {

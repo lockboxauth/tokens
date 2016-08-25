@@ -1,7 +1,7 @@
 {
 	"ImportPath": "code.impractical.co/tokens",
-	"GoVersion": "go1.6",
-	"GodepVersion": "v62",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v74",
 	"Packages": [
 		"./..."
 	],
@@ -12,22 +12,21 @@
 			"Rev": "'75cd24fc2f2c2a2088577d12123ddee5f54e0675'"
 		},
 		{
-			"ImportPath": "code.secondbit.org/pqarrays.hg",
-			"Comment": "null-3",
-			"Rev": "'9a415db0346a9c758455b735bc5135d8a030e6a2'"
-		},
-		{
-			"ImportPath": "code.secondbit.org/uuid.hg",
-			"Comment": "null-8",
-			"Rev": "'15ee0cb56e65a4d866745e413efc20114d691862'"
+			"ImportPath": "code.impractical.co/pqarrays",
+			"Rev": "e02237bd0f22fbf34ddfc1ecdedde1c62124a483"
 		},
 		{
 			"ImportPath": "darlinggo.co/api",
-			"Rev": "87e2878b792670a7b13ecd94f40ba82dc7b3de60"
+			"Rev": "80fa2f4e5a3fb452488095e55ffb07344c8c4f11"
 		},
 		{
 			"ImportPath": "darlinggo.co/hash",
 			"Rev": "3ecb1d8049fdb265593e2dcd2f76636c306906be"
+		},
+		{
+			"ImportPath": "darlinggo.co/pan",
+			"Comment": "v0.1.0-1-gfff7af8",
+			"Rev": "fff7af8f1e4c8d005ac22f7ec23e4937cc698a26"
 		},
 		{
 			"ImportPath": "darlinggo.co/trout",
@@ -87,20 +86,12 @@
 		},
 		{
 			"ImportPath": "github.com/pborman/uuid",
-			"Comment": "v1.0-11-gc55201b",
-			"Rev": "c55201b036063326c5b1b89ccfe45a184973d073"
-		},
-		{
-			"ImportPath": "github.com/secondbit/pan",
-			"Rev": "680707ad0cd640bcb8741a3debef012ad9bfed5b"
+			"Comment": "v1.0-15-gb984ec7",
+			"Rev": "b984ec7fa9ff9e428bd0cf0abf429384dfbe3e37"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/pbkdf2",
 			"Rev": "5bcd134fee4dd1475da17714aac19c0aa0142e2f"
-		},
-		{
-			"ImportPath": "golang.org/x/net/context",
-			"Rev": "fb93926129b8ec0056f2f458b1f519654814edf0"
 		}
 	]
 }

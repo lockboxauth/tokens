@@ -5,7 +5,7 @@ import (
 
 	"code.impractical.co/tokens"
 
-	"code.secondbit.org/pqarrays.hg"
+	"code.impractical.co/pqarrays"
 )
 
 // RefreshToken is a representation of the tokens.RefreshToken type. It is

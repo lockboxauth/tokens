@@ -1,12 +1,11 @@
 package tokens
 
 import (
+	"context"
 	"sort"
 	"strconv"
 	"sync"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 // Memstore is an in-memory implementation of the Storer interface, for use in testing.

@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -12,8 +13,6 @@ import (
 
 	_ "github.com/mattes/migrate/driver/postgres"
 	"github.com/mattes/migrate/migrate"
-
-	"golang.org/x/net/context"
 )
 
 func init() {

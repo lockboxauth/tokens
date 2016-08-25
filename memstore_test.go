@@ -1,9 +1,8 @@
 package tokens
 
 import (
+	"context"
 	"fmt"
-
-	"golang.org/x/net/context"
 )
 
 func init() {

@@ -1,11 +1,11 @@
 package apiv1
 
 import (
+	"context"
 	"net/http"
 
 	"darlinggo.co/api"
 	"darlinggo.co/trout"
-	"golang.org/x/net/context"
 )
 
 // GetRouter returns a trout Router that is configured to handle

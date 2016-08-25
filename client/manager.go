@@ -1,6 +1,7 @@
 package tokensClient
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -8,8 +9,6 @@ import (
 	"sync"
 
 	"darlinggo.co/hash"
-
-	"golang.org/x/net/context"
 )
 
 var (

@@ -1,13 +1,13 @@
 package apiv1
 
 import (
+	"context"
 	"net/http"
 
 	"code.impractical.co/tokens"
 
 	"darlinggo.co/api"
 	"darlinggo.co/trout"
-	"golang.org/x/net/context"
 )
 
 // all these handlers are written on the assumption that this service will only be exposed

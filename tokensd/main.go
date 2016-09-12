@@ -38,14 +38,12 @@ func main() {
 		log.Printf("Error running migrations: %+v\n", errs)
 		os.Exit(1)
 	}
-	ctx = tokens.SetStorer(ctx, storer)
+	v1 := apiv1.APIv1{tokens.Dependencies{Storer: storer}}
 
-	// Set up API v1 handlers
-	v1 := apiv1.GetRouter(ctx, "/v1")
 	// we need both to avoid redirecting, which turns POST into GET
 	// the slash is needed to handle /v1/*
-	http.Handle("/v1/", v1)
-	http.Handle("/v1", v1)
+	http.Handle("/v1/", v1.Server(ctx, "/v1/"))
+	http.Handle("/v1", v1.Server(ctx, "/v1"))
 
 	// set up version handler
 	http.Handle("/version", version.Handler)

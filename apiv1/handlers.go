@@ -1,7 +1,6 @@
 package apiv1
 
 import (
-	"context"
 	"net/http"
 
 	"code.impractical.co/tokens"
@@ -10,10 +9,17 @@ import (
 	"darlinggo.co/trout"
 )
 
+// APIv1 handles all the dependencies for the apiv1 package. This is a superset of the
+// tokens.Dependencies struct, and a valid Dependencies struct is necessary for a valid
+// APIv1 struct.
+type APIv1 struct {
+	tokens.Dependencies
+}
+
 // all these handlers are written on the assumption that this service will only be exposed
 // internally. So there's no authorization or anything on any of them.
 
-func handleInsertToken(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func (a APIv1) handleInsertToken(w http.ResponseWriter, r *http.Request) {
 	var body RefreshToken
 	err := api.Decode(r, &body)
 	if err != nil {
@@ -40,7 +46,7 @@ func handleInsertToken(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		api.Encode(w, r, http.StatusBadRequest, reqErrs)
 		return
 	}
-	err = tokens.Create(ctx, token)
+	err = a.Storer.CreateToken(r.Context(), token)
 	if err != nil {
 		if err == tokens.ErrTokenAlreadyExists {
 			api.Encode(w, r, http.StatusBadRequest, []api.RequestError{{Field: "/id", Slug: api.RequestErrConflict}})
@@ -56,13 +62,13 @@ func handleInsertToken(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	api.Encode(w, r, http.StatusCreated, Response{Tokens: []RefreshToken{apiToken(token)}})
 }
 
-func handleGetToken(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func (a APIv1) handleGetToken(w http.ResponseWriter, r *http.Request) {
 	id := trout.RequestVars(r).Get("id")
 	if id == "" {
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrMissing, Param: "{id}"}}})
 		return
 	}
-	token, err := tokens.Get(ctx, id)
+	token, err := a.Storer.GetToken(r.Context(), id)
 	if err == tokens.ErrTokenNotFound {
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrNotFound, Param: "{id}"}}})
 		return
@@ -73,14 +79,14 @@ func handleGetToken(ctx context.Context, w http.ResponseWriter, r *http.Request)
 	api.Encode(w, r, http.StatusOK, Response{Tokens: []RefreshToken{apiToken(token)}})
 }
 
-func handlePatchToken(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func (a APIv1) handlePatchToken(w http.ResponseWriter, r *http.Request) {
 	var body RefreshTokenChange
 	id := trout.RequestVars(r).Get("id")
 	if id == "" {
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrMissing, Param: "{id}"}}})
 		return
 	}
-	token, err := tokens.Get(ctx, id)
+	token, err := a.Storer.GetToken(r.Context(), id)
 	if err == tokens.ErrTokenNotFound {
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrNotFound, Param: "{id}"}}})
 		return
@@ -94,7 +100,7 @@ func handlePatchToken(ctx context.Context, w http.ResponseWriter, r *http.Reques
 		return
 	}
 	change := coreChange(body)
-	err = tokens.Update(ctx, change)
+	err = a.Storer.UpdateTokens(r.Context(), change)
 	if err != nil {
 		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
 		return
@@ -103,7 +109,7 @@ func handlePatchToken(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	api.Encode(w, r, http.StatusOK, Response{Tokens: []RefreshToken{apiToken(token)}})
 }
 
-func handlePostToken(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func (a APIv1) handlePostToken(w http.ResponseWriter, r *http.Request) {
 	var body RefreshToken
 	id := trout.RequestVars(r).Get("id")
 	if id == "" {
@@ -115,7 +121,7 @@ func handlePostToken(ctx context.Context, w http.ResponseWriter, r *http.Request
 		api.Encode(w, r, http.StatusBadRequest, api.InvalidFormatError)
 		return
 	}
-	token, err := tokens.Validate(ctx, id, body.Value)
+	token, err := a.Validate(r.Context(), id, body.Value)
 	if err == tokens.ErrInvalidToken {
 		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrInvalidValue}}})
 		return

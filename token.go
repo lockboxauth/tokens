@@ -14,8 +14,6 @@ import (
 	"github.com/pborman/uuid"
 )
 
-type storerCtxKeyType struct{}
-
 const (
 	// NumTokenResults is the number of Tokens to retrieve when listing Tokens.
 	NumTokenResults = 25
@@ -32,14 +30,6 @@ var (
 	// ErrTokenHashAlreadyExists is returned when the combination of a Token's Hash, HashSalt, and
 	// HashIterations properties all exists in the database.
 	ErrTokenHashAlreadyExists = errors.New("token hash, salt, and iteration combination already exists")
-
-	// ErrStorerKeyEmpty is returned when a context.Context has no value for storerCtxKey.
-	ErrStorerKeyEmpty = errors.New("no Storer set in context")
-	// ErrStorerKeyNotStorer is returned when the stroerCtxKey value in a context.Context does not fulfill
-	// the Storer interface.
-	ErrStorerKeyNotStorer = errors.New("value of Storer key in context is not a Storer")
-
-	storerCtxKey = storerCtxKeyType{}
 
 	calculatedHashIterations = 0
 )
@@ -187,78 +177,16 @@ func (r RefreshTokensByCreatedAt) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
-// GetStorer returns a Storer from the passed context.Context. If no Storer is set, an ErrStorerKeyEmpty
-// error will be returned. If a Storer is set but does not fill the Storer interface, an ErrStorerKeyNotStorer
-// error will be returned.
-func GetStorer(ctx context.Context) (Storer, error) {
-	val := ctx.Value(storerCtxKey)
-	if val == nil {
-		return nil, ErrStorerKeyEmpty
-	}
-	storer, ok := val.(Storer)
-	if !ok {
-		return nil, ErrStorerKeyNotStorer
-	}
-	return storer, nil
-}
-
-// SetStorer returns a copy of `ctx`, but with its storerCtxKey value set
-// to the passed Storer. This Storer can then be retrieved using GetStorer.
-func SetStorer(ctx context.Context, storer Storer) context.Context {
-	return context.WithValue(ctx, storerCtxKey, storer)
-}
-
-// Create inserts `token` into the Storer associated with `ctx`. If a RefreshToken
-// with the same ID already exists in the Storer, an ErrTokenAlreadyExists error
-// will be returned, and the RefreshToken will not be inserted.
-func Create(ctx context.Context, token RefreshToken) error {
-	storer, err := GetStorer(ctx)
-	if err != nil {
-		return err
-	}
-	err = storer.CreateToken(ctx, token)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Get retrieves the RefreshToken with an ID matching `id` from the Storer associated
-// with `ctx`. If no RefreshToken has that ID, an ErrTokenNotFound error is returned.
-func Get(ctx context.Context, id string) (RefreshToken, error) {
-	storer, err := GetStorer(ctx)
-	if err != nil {
-		return RefreshToken{}, err
-	}
-	token, err := storer.GetToken(ctx, id)
-	if err != nil {
-		return RefreshToken{}, err
-	}
-	return token, nil
-}
-
-// Update applies `change` to all the RefreshTokens in the Storer associated with `ctx`
-// that match the ID, ProfileID, or ClientID constraints of `change`.
-func Update(ctx context.Context, change RefreshTokenChange) error {
-	storer, err := GetStorer(ctx)
-	if err != nil {
-		return err
-	}
-	err = storer.UpdateTokens(ctx, change)
-	if err != nil {
-		return err
-	}
-	return nil
+// Dependencies manages the dependency injection for the tokens package. All its properties are required for
+// a Dependencies struct to be valid.
+type Dependencies struct {
+	Storer Storer // Storer is the Storer to use when retrieving, setting, or removing RefreshTokens.
 }
 
 // Validate checks that the token with the given ID has the given value, and returns an
 // ErrInvalidToken if not.
-func Validate(ctx context.Context, id, value string) (RefreshToken, error) {
-	storer, err := GetStorer(ctx)
-	if err != nil {
-		return RefreshToken{}, err
-	}
-	token, err := storer.GetToken(ctx, id)
+func (d Dependencies) Validate(ctx context.Context, id, value string) (RefreshToken, error) {
+	token, err := d.Storer.GetToken(ctx, id)
 	if err != nil {
 		return RefreshToken{}, err
 	}

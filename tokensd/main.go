@@ -38,7 +38,7 @@ func main() {
 		log.Printf("Error running migrations: %+v\n", errs)
 		os.Exit(1)
 	}
-	v1 := apiv1.APIv1{tokens.Dependencies{Storer: storer}}
+	v1 := apiv1.APIv1{Dependencies: tokens.Dependencies{Storer: storer}}
 
 	// we need both to avoid redirecting, which turns POST into GET
 	// the slash is needed to handle /v1/*

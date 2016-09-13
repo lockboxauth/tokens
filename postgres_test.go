@@ -3,16 +3,15 @@ package tokens
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
-	"fmt"
 	"log"
 	"net/url"
 	"os"
-	"strconv"
 	"sync"
 
-	_ "github.com/mattes/migrate/driver/postgres"
-	"github.com/mattes/migrate/migrate"
+	"github.com/pborman/uuid"
+	"github.com/rubenv/sql-migrate"
 )
 
 func init() {
@@ -27,63 +26,70 @@ func init() {
 }
 
 type PostgresFactory struct {
-	db    *sql.DB
-	count int
-	lock  sync.Mutex
+	db        *sql.DB
+	databases map[string]*sql.DB
+	lock      sync.Mutex
 }
 
-func (p *PostgresFactory) NewStorer(ctx context.Context) (context.Context, Storer, error) {
-	p.lock.Lock()
-	p.count++
-	count := p.count
-	p.lock.Unlock()
-	_, err := p.db.Exec("CREATE DATABASE tokens_test_" + strconv.Itoa(count) + ";")
-	if err != nil {
-		log.Printf("Error creating database tokens_test_%d: %+v\n", count, err)
-		return ctx, nil, err
-	}
-
+func (p *PostgresFactory) NewStorer(ctx context.Context) (Storer, error) {
 	u, err := url.Parse(os.Getenv("PG_TEST_DB"))
 	if err != nil {
 		log.Printf("Error parsing PG_TEST_DB as a URL: %+v\n", err)
-		return ctx, nil, err
+		return nil, err
 	}
 	if u.Scheme != "postgres" {
-		return ctx, nil, errors.New("PG_TEST_DB must begin with postgres://")
-	}
-	u.Path = "/tokens_test_" + strconv.Itoa(count)
-
-	migrations := os.Getenv("PG_MIGRATIONS_DIR")
-	if migrations == "" {
-		migrations = "./sql"
-	}
-	errs, ok := migrate.UpSync(u.String(), migrations)
-	if !ok {
-		return ctx, nil, fmt.Errorf("Error setting up database %s: %+v\n", u.String(), errs)
+		return nil, errors.New("PG_TEST_DB must begin with postgres://")
 	}
 
-	storer, err := NewPostgres(ctx, u.String())
+	database := "tokens_test_" + hex.EncodeToString([]byte(uuid.NewRandom()))
+
+	_, err = p.db.Exec("CREATE DATABASE " + database + ";")
 	if err != nil {
-		return ctx, nil, err
+		log.Printf("Error creating database %s: %+v\n", database, err)
+		return nil, err
+
 	}
-	return ctx, storer, nil
+	u.Path = "/" + database
+	newConn, err := sql.Open("postgres", u.String())
+	if err != nil {
+		log.Println("Accidentally orphaned", database, "it will need to be cleaned up manually")
+		return nil, err
+	}
+
+	p.lock.Lock()
+	if p.databases == nil {
+		p.databases = map[string]*sql.DB{}
+	}
+	p.databases[database] = newConn
+	p.lock.Unlock()
+
+	migrations := &migrate.AssetMigrationSource{
+		Asset:    Asset,
+		AssetDir: AssetDir,
+		Dir:      "sql",
+	}
+	_, err = migrate.Exec(newConn, "postgres", migrations, migrate.Up)
+	if err != nil {
+		return nil, err
+	}
+
+	storer, err := NewPostgres(ctx, newConn)
+	if err != nil {
+		return nil, err
+	}
+	return storer, nil
 }
 
-func (p *PostgresFactory) TeardownStorer(ctx context.Context, storer Storer) error {
-	pgStorer, ok := storer.(Postgres)
-	if !ok {
-		return fmt.Errorf("Expected Storer to be Postgres, got %T\n", storer)
+func (p *PostgresFactory) TeardownStorer() error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	for table, conn := range p.databases {
+		conn.Close()
+		_, err := p.db.Exec("DROP DATABASE " + table + ";")
+		if err != nil {
+			return err
+		}
 	}
-	query := "SELECT current_database();"
-	var tableName string
-	err := pgStorer.db.QueryRow(query).Scan(&tableName)
-	if err != nil {
-		return err
-	}
-	pgStorer.db.Close()
-	_, err = p.db.Exec("DROP DATABASE " + tableName + ";")
-	if err != nil {
-		return err
-	}
+	p.db.Close()
 	return nil
 }

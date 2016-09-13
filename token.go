@@ -1,5 +1,7 @@
 package tokens
 
+//go:generate go-bindata -pkg $GOPACKAGE -o migrations.go sql/
+
 import (
 	"context"
 	"crypto/rand"

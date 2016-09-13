@@ -2,7 +2,10 @@ package tokens
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -16,8 +19,8 @@ const (
 )
 
 type StorerFactory interface {
-	NewStorer(ctx context.Context) (context.Context, Storer, error)
-	TeardownStorer(ctx context.Context, storer Storer) error
+	NewStorer(ctx context.Context) (Storer, error)
+	TeardownStorer() error
 }
 
 var storerFactories []StorerFactory
@@ -67,11 +70,23 @@ func compareRefreshTokens(token1, token2 RefreshToken) (success bool, field stri
 	return true, "", nil, nil
 }
 
+func TestMain(m *testing.M) {
+	flag.Parse()
+	result := m.Run()
+	for _, factory := range storerFactories {
+		err := factory.TeardownStorer()
+		if err != nil {
+			log.Printf("Error cleaning up after %T: %+v\n", factory, err)
+		}
+	}
+	os.Exit(result)
+}
+
 func TestCreateAndGetToken(t *testing.T) {
 	t.Parallel()
 	for _, factory := range storerFactories {
 		ctx := context.Background()
-		ctx, storer, err := factory.NewStorer(ctx)
+		storer, err := factory.NewStorer(ctx)
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
@@ -116,10 +131,6 @@ func TestCreateAndGetToken(t *testing.T) {
 				t.Errorf("Expected %s to be %v, got %v\n", field, expected, got)
 			}
 		})
-		err = factory.TeardownStorer(ctx, storer)
-		if err != nil {
-			t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
-		}
 	}
 }
 
@@ -127,7 +138,7 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 	t.Parallel()
 	for _, factory := range storerFactories {
 		ctx := context.Background()
-		ctx, storer, err := factory.NewStorer(ctx)
+		storer, err := factory.NewStorer(ctx)
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
@@ -178,10 +189,6 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 				t.Errorf("Expected ErrTokenHashAlreadyExists, %T return %+v\n", storer, err)
 			}
 		})
-		err = factory.TeardownStorer(ctx, storer)
-		if err != nil {
-			t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
-		}
 	}
 }
 
@@ -189,7 +196,7 @@ func TestGetTokenErrTokenNotFound(t *testing.T) {
 	t.Parallel()
 	for _, factory := range storerFactories {
 		ctx := context.Background()
-		ctx, storer, err := factory.NewStorer(ctx)
+		storer, err := factory.NewStorer(ctx)
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
@@ -201,10 +208,6 @@ func TestGetTokenErrTokenNotFound(t *testing.T) {
 				t.Errorf("Expected ErrTokenNotFound, %T returned %+v and %+v\n", storer, token, err)
 			}
 		})
-		err = factory.TeardownStorer(ctx, storer)
-		if err != nil {
-			t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
-		}
 	}
 }
 
@@ -212,7 +215,7 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 	t.Parallel()
 	for _, factory := range storerFactories {
 		ctx := context.Background()
-		ctx, storer, err := factory.NewStorer(ctx)
+		storer, err := factory.NewStorer(ctx)
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
@@ -296,10 +299,6 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 				})
 			}
 		})
-		err = factory.TeardownStorer(ctx, storer)
-		if err != nil {
-			t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
-		}
 	}
 }
 
@@ -307,7 +306,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 	t.Parallel()
 	for _, factory := range storerFactories {
 		ctx := context.Background()
-		ctx, storer, err := factory.NewStorer(ctx)
+		storer, err := factory.NewStorer(ctx)
 		if err != nil {
 			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
 		}
@@ -452,9 +451,5 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				t.Errorf("Expected %d results, got %d from %T: %+v\n", len(expectations), len(results), storer, results)
 			}
 		})
-		err = factory.TeardownStorer(ctx, storer)
-		if err != nil {
-			t.Errorf("Error cleaning up after %T: %+v\n", storer, err)
-		}
 	}
 }

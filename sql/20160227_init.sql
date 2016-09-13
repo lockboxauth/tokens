@@ -1,3 +1,4 @@
+-- +migrate Up
 CREATE TABLE tokens (
 	id VARCHAR(64) PRIMARY KEY,
 	created_at TIMESTAMPTZ NOT NULL,
@@ -8,3 +9,6 @@ CREATE TABLE tokens (
 	used BOOLEAN NOT NULL,
 	scopes VARCHAR[] NOT NULL
 );
+
+-- +migrate Down
+DROP TABLE tokens;

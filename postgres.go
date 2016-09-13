@@ -17,11 +17,7 @@ type Postgres struct {
 }
 
 // NewPostgres returns an instance of Postgres that is ready to be used as a Storer.
-func NewPostgres(ctx context.Context, conn string) (Postgres, error) {
-	db, err := sql.Open("postgres", conn)
-	if err != nil {
-		return Postgres{}, err
-	}
+func NewPostgres(ctx context.Context, db *sql.DB) (Postgres, error) {
 	return Postgres{db: db}, nil
 }
 

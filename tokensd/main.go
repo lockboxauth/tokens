@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
 
-	"darlinggo.co/version"
+	"github.com/rubenv/sql-migrate"
 
-	_ "github.com/mattes/migrate/driver/postgres"
-	"github.com/mattes/migrate/migrate"
+	"darlinggo.co/version"
 
 	"code.impractical.co/tokens"
 	"code.impractical.co/tokens/apiv1"
@@ -24,18 +24,24 @@ func main() {
 		log.Println("Error setting up Postgres: no connection string set.")
 		os.Exit(1)
 	}
-	storer, err := tokens.NewPostgres(ctx, postgres)
+	db, err := sql.Open("postgres", postgres)
 	if err != nil {
-		log.Printf("Error setting up Postgres: %+v\n", err)
+		log.Printf("Error connecting to Postgres: %+v\n", err)
 		os.Exit(1)
 	}
-	migrations := os.Getenv("PG_MIGRATIONS_DIR")
-	if migrations == "" {
-		migrations = "./sql"
+	migrations := &migrate.AssetMigrationSource{
+		Asset:    tokens.Asset,
+		AssetDir: tokens.AssetDir,
+		Dir:      "sql",
 	}
-	errs, ok := migrate.UpSync(postgres, migrations)
-	if !ok {
-		log.Printf("Error running migrations: %+v\n", errs)
+	_, err = migrate.Exec(db, "postgres", migrations, migrate.Up)
+	if err != nil {
+		log.Printf("Error running migrations for Postgres: %+v\n", err)
+		os.Exit(1)
+	}
+	storer, err := tokens.NewPostgres(ctx, db)
+	if err != nil {
+		log.Printf("Error setting up Postgres: %+v\n", err)
 		os.Exit(1)
 	}
 	v1 := apiv1.APIv1{Dependencies: tokens.Dependencies{Storer: storer}}

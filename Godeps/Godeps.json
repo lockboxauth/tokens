@@ -55,43 +55,26 @@
 			"Rev": "3cd0097429be7d611bb644ef85b42bfb102ceea4"
 		},
 		{
-			"ImportPath": "github.com/mattes/migrate/driver",
-			"Comment": "v1.2.0-69-gbd05d62",
-			"Rev": "bd05d6207339ba9942e8c2973d959fb18eede898"
-		},
-		{
-			"ImportPath": "github.com/mattes/migrate/driver/postgres",
-			"Comment": "v1.2.0-69-gbd05d62",
-			"Rev": "bd05d6207339ba9942e8c2973d959fb18eede898"
-		},
-		{
-			"ImportPath": "github.com/mattes/migrate/file",
-			"Comment": "v1.2.0-69-gbd05d62",
-			"Rev": "bd05d6207339ba9942e8c2973d959fb18eede898"
-		},
-		{
-			"ImportPath": "github.com/mattes/migrate/migrate",
-			"Comment": "v1.2.0-69-gbd05d62",
-			"Rev": "bd05d6207339ba9942e8c2973d959fb18eede898"
-		},
-		{
-			"ImportPath": "github.com/mattes/migrate/migrate/direction",
-			"Comment": "v1.2.0-69-gbd05d62",
-			"Rev": "bd05d6207339ba9942e8c2973d959fb18eede898"
-		},
-		{
-			"ImportPath": "github.com/mattes/migrate/pipe",
-			"Comment": "v1.2.0-69-gbd05d62",
-			"Rev": "bd05d6207339ba9942e8c2973d959fb18eede898"
-		},
-		{
 			"ImportPath": "github.com/pborman/uuid",
 			"Comment": "v1.0-15-gb984ec7",
 			"Rev": "b984ec7fa9ff9e428bd0cf0abf429384dfbe3e37"
 		},
 		{
+			"ImportPath": "github.com/rubenv/sql-migrate",
+			"Rev": "6f4757563362064790a6687a6b60f182062c8634"
+		},
+		{
+			"ImportPath": "github.com/rubenv/sql-migrate/sqlparse",
+			"Rev": "6f4757563362064790a6687a6b60f182062c8634"
+		},
+		{
 			"ImportPath": "golang.org/x/crypto/pbkdf2",
 			"Rev": "5bcd134fee4dd1475da17714aac19c0aa0142e2f"
+		},
+		{
+			"ImportPath": "gopkg.in/gorp.v1",
+			"Comment": "v1.7.1",
+			"Rev": "c87af80f3cc5036b55b83d77171e156791085e2e"
 		}
 	]
 }

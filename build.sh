@@ -6,7 +6,3 @@ source vendor/darlinggo.co/version/ldflags.sh
 
 # build the binary
 CGO_ENABLED=$CGO_ENABLED GOOS=$GOOS GOARCH=$GOARCH go build -o ./tokensd/tokensd -ldflags "${LDFLAGS}" ./tokensd
-
-# remove any old sql migrations and copy in the current ones
-rm -rf ./tokensd/sql
-cp -r ./sql ./tokensd/sql

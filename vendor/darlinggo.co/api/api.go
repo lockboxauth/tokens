@@ -10,8 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hashicorp/go-multierror"
-
 	"bitbucket.org/ww/goautoneg"
 
 	"github.com/pborman/uuid"
@@ -162,21 +160,21 @@ type ErrorDef struct {
 	Err  error
 }
 
-func DecodeErrors(r *http.Response, errs []RequestError, defs []ErrorDef) error {
-	var res *multierror.Error
+func DecodeErrors(r *http.Response, errs []RequestError, defs []ErrorDef) []error {
+	var resp []error
 	for _, err := range errs {
 		var handled bool
 		for _, def := range defs {
 			if def.Test(r, err) {
-				res = multierror.Append(res, def.Err)
+				resp = append(resp, def.Err)
 				handled = true
 			}
 		}
 		if !handled {
-			res = multierror.Append(res, UnhandledRequestError(err))
+			resp = append(resp, UnhandledRequestError(err))
 		}
 	}
-	return res.ErrorOrNil()
+	return resp
 }
 
 func ErrorDefCodeFieldSlug(code int, field, slug string) func(*http.Response, RequestError) bool {

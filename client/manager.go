@@ -7,6 +7,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"time"
 
 	"darlinggo.co/hash"
 )
@@ -18,15 +19,15 @@ var (
 
 // Token is a representation of a RefreshToken obtained from the API.
 type Token struct {
-	ID          string   `json:"id"`
-	Value       string   `json:"value"`
-	CreatedAt   string   `json:"createdAt"`
-	CreatedFrom string   `json:"createdFrom"`
-	Scopes      []string `json:"scopes"`
-	ProfileID   string   `json:"profileID"`
-	ClientID    string   `json:"clientID"`
-	Revoked     bool     `json:"revoked"`
-	Used        bool     `json:"used"`
+	ID          string    `json:"id"`
+	Value       string    `json:"value"`
+	CreatedAt   time.Time `json:"createdAt"`
+	CreatedFrom string    `json:"createdFrom"`
+	Scopes      []string  `json:"scopes"`
+	ProfileID   string    `json:"profileID"`
+	ClientID    string    `json:"clientID"`
+	Revoked     bool      `json:"revoked"`
+	Used        bool      `json:"used"`
 }
 
 // IsValid returns true if the Token is still considered valid and usable.
@@ -54,11 +55,11 @@ func Break(val string) (id, value string, err error) {
 // Manager encompasses the possible actions to take on Tokens. It defines how clients
 // will interact with the API.
 type Manager interface {
-	Get(ctx context.Context, id string) (Token, error)
-	Validate(ctx context.Context, token string) error
-	Insert(ctx context.Context, token Token) (Token, error)
-	Revoke(ctx context.Context, id string) error
-	Use(ctx context.Context, id string) error
+	Get(ctx context.Context, id string) (Token, []error)
+	Validate(ctx context.Context, token string) []error
+	Insert(ctx context.Context, token Token) (Token, []error)
+	Revoke(ctx context.Context, id string) []error
+	Use(ctx context.Context, id string) []error
 }
 
 // MemoryManager is an in-memory implementation of the Manager interface, for use in testing.
@@ -76,22 +77,22 @@ func NewMemoryManager() *MemoryManager {
 
 // Get retrieves the Token specified by the ID passed in. If no Tokens match that ID, an
 // ErrTokenNotFound is returned.
-func (m *MemoryManager) Get(ctx context.Context, id string) (Token, error) {
+func (m *MemoryManager) Get(ctx context.Context, id string) (Token, []error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	t, ok := m.tokens[id]
 	if !ok {
-		return Token{}, ErrTokenNotFound
+		return Token{}, []error{ErrTokenNotFound}
 	}
 	return t, nil
 }
 
 // Validate checks that the passed string represents a valid Token.
-func (m *MemoryManager) Validate(ctx context.Context, token string) error {
+func (m *MemoryManager) Validate(ctx context.Context, token string) []error {
 	id, value, err := Break(token)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 
 	m.lock.Lock()
@@ -99,21 +100,21 @@ func (m *MemoryManager) Validate(ctx context.Context, token string) error {
 
 	t, ok := m.tokens[id]
 	if !ok {
-		return ErrInvalidTokenString
+		return []error{ErrInvalidTokenString}
 	}
 	if !hash.Compare([]byte(value), []byte(t.Value)) {
-		return ErrInvalidTokenString
+		return []error{ErrInvalidTokenString}
 	}
 	return nil
 }
 
 // Insert creates the passed Token in the tokens service. The token returned is the what
 // the service actually persisted, after it filled any defaults.
-func (m *MemoryManager) Insert(ctx context.Context, token Token) (Token, error) {
+func (m *MemoryManager) Insert(ctx context.Context, token Token) (Token, []error) {
 	b := make([]byte, 32)
 	_, err := rand.Read(b)
 	if err != nil {
-		return Token{}, err
+		return Token{}, []error{err}
 	}
 	token.ID = hex.EncodeToString(b)
 
@@ -126,13 +127,13 @@ func (m *MemoryManager) Insert(ctx context.Context, token Token) (Token, error) 
 
 // Revoke marks the Token associated with the passed ID as revoked, probably for security
 // reasons. If no Token matches the ID provided, ErrTokenNotFound is returned.
-func (m *MemoryManager) Revoke(ctx context.Context, id string) error {
+func (m *MemoryManager) Revoke(ctx context.Context, id string) []error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	t, ok := m.tokens[id]
 	if !ok {
-		return ErrTokenNotFound
+		return []error{ErrTokenNotFound}
 	}
 	t.Revoked = true
 	m.tokens[t.ID] = t
@@ -142,13 +143,13 @@ func (m *MemoryManager) Revoke(ctx context.Context, id string) error {
 
 // Use marks the Token associated with the passed ID as used, meaning it can't be used again.
 // If no Token matches the passed ID, ErrTokenNotFound is returned.
-func (m *MemoryManager) Use(ctx context.Context, id string) error {
+func (m *MemoryManager) Use(ctx context.Context, id string) []error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	t, ok := m.tokens[id]
 	if !ok {
-		return ErrTokenNotFound
+		return []error{ErrTokenNotFound}
 	}
 	t.Used = true
 	m.tokens[t.ID] = t

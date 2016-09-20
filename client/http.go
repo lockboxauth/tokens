@@ -7,7 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
-	"path"
+	"strings"
 
 	"darlinggo.co/api"
 	"darlinggo.co/version"
@@ -70,7 +70,7 @@ type APIManager struct {
 }
 
 func (a APIManager) buildURL(p string) string {
-	return path.Join(a.BaseURL, p)
+	return strings.TrimSuffix(a.BaseURL, "/") + "/" + strings.TrimPrefix(p, "/")
 }
 
 func (a APIManager) setHeaders(req *http.Request) {
@@ -105,154 +105,157 @@ func NewAPIManager(client Doer, baseURL, application string) *APIManager {
 
 // Get retrieves a single Token from the API. If the ID passed can't be
 // found, Get returns an ErrTokenNotFound error.
-func (a *APIManager) Get(ctx context.Context, id string) (Token, error) {
+func (a *APIManager) Get(ctx context.Context, id string) (Token, []error) {
 	req, err := http.NewRequest("GET", a.buildURL("/"+id), nil)
 	if err != nil {
-		return Token{}, err
+		return Token{}, []error{err}
 	}
 	a.setHeaders(req)
 	resp, err := a.doer.Do(req)
 	if err != nil {
-		return Token{}, err
+		return Token{}, []error{err}
 	}
 	var r response
 	err = decode(resp, &r)
 	if err != nil {
-		return Token{}, err
+		return Token{}, []error{err}
 	}
-	err = api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
+	errs := api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
 		{Test: api.ActOfGodDef, Err: ErrServerError},
 		{Test: api.InvalidFormatDef, Err: ErrInvalidRequestFormat},
 		{Test: api.ParamNotFoundDef("{id}"), Err: ErrTokenNotFound},
 	})
-	if err != nil {
-		return Token{}, err
+	if len(errs) > 0 {
+		return Token{}, errs
 	}
 	if len(r.Tokens) != 1 {
-		return Token{}, ErrUnexpectedNumberOfTokens(r.Tokens)
+		return Token{}, []error{ErrUnexpectedNumberOfTokens(r.Tokens)}
 	}
 	return r.Tokens[0], nil
 }
 
 // Validate checks that the encoded Token provided is a valid token, and
 // returns an ErrInvalidTokenString if not.
-func (a *APIManager) Validate(ctx context.Context, token string) error {
+func (a *APIManager) Validate(ctx context.Context, token string) []error {
 	id, value, err := Break(token)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	err = enc.Encode(map[string]string{"value": value})
 	if err != nil {
-		return err
+		return []error{err}
 	}
-	req, err := http.NewRequest("POST", a.buildURL("/"+id), nil)
+	req, err := http.NewRequest("POST", a.buildURL("/"+id), &buf)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 	a.setHeaders(req)
 	resp, err := a.doer.Do(req)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 	var r response
 	err = decode(resp, &r)
 	if err != nil {
-		return err
+		return []error{err}
 	}
-	err = api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
+	errs := api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
 		{Test: api.ActOfGodDef, Err: ErrServerError},
 		{Test: api.ErrDefCodeParamSlug(http.StatusBadRequest, "", api.RequestErrInvalidValue), Err: ErrInvalidTokenString},
 	})
-	if err != nil {
-		return err
+	if len(errs) > 0 {
+		return errs
 	}
 	return nil
 }
 
 // Insert inserts the passed Token into the service exposed by the API.
-func (a *APIManager) Insert(ctx context.Context, token Token) (Token, error) {
+func (a *APIManager) Insert(ctx context.Context, token Token) (Token, []error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	err := enc.Encode(token)
 	if err != nil {
-		return Token{}, err
+		return Token{}, []error{err}
 	}
 	req, err := http.NewRequest("POST", a.buildURL("/"), &buf)
 	if err != nil {
-		return Token{}, err
+		return Token{}, []error{err}
 	}
 	a.setHeaders(req)
 	resp, err := a.doer.Do(req)
 	if err != nil {
-		return Token{}, err
+		return Token{}, []error{err}
 	}
 	var r response
 	err = decode(resp, &r)
 	if err != nil {
-		return Token{}, err
+		return Token{}, []error{err}
 	}
-	err = api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
+	errs := api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
 		{Test: api.ActOfGodDef, Err: ErrServerError},
 		{Test: api.InvalidFormatDef, Err: ErrInvalidRequestFormat},
 	})
+	if len(errs) > 0 {
+		return Token{}, errs
+	}
 	if len(r.Tokens) != 1 {
-		return Token{}, ErrUnexpectedNumberOfTokens(r.Tokens)
+		return Token{}, []error{ErrUnexpectedNumberOfTokens(r.Tokens)}
 	}
 	return r.Tokens[0], nil
 }
 
 // Revoke marks the Token identified by the passed ID as revoked, usually for
 // security purposes.
-func (a *APIManager) Revoke(ctx context.Context, id string) error {
+func (a *APIManager) Revoke(ctx context.Context, id string) []error {
 	buf := bytes.NewBufferString(`{"revoked": true}`)
 	req, err := http.NewRequest("PATCH", a.buildURL("/"+id), buf)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 	a.setHeaders(req)
 	resp, err := a.doer.Do(req)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 	var r response
 	err = decode(resp, &r)
 	if err != nil {
-		return err
+		return []error{err}
 	}
-	err = api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
+	errs := api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
 		{Test: api.ActOfGodDef, Err: ErrServerError},
 		{Test: api.InvalidFormatDef, Err: ErrInvalidRequestFormat},
 		{Test: api.ParamNotFoundDef("{id}"), Err: ErrTokenNotFound},
 	})
-	return err
+	return errs
 }
 
 // Use marks the Token identified by the passed ID as used, signaling that it
 // should not be considered valid in future requests.
-func (a *APIManager) Use(ctx context.Context, id string) error {
+func (a *APIManager) Use(ctx context.Context, id string) []error {
 	buf := bytes.NewBufferString(`{"used": true}`)
 	req, err := http.NewRequest("PATCH", a.buildURL("/"+id), buf)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 	a.setHeaders(req)
 	resp, err := a.doer.Do(req)
 	if err != nil {
-		return err
+		return []error{err}
 	}
 	var r response
 	err = decode(resp, &r)
 	if err != nil {
-		return err
+		return []error{err}
 	}
-	err = api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
+	errs := api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
 		{Test: api.ActOfGodDef, Err: ErrServerError},
 		{Test: api.InvalidFormatDef, Err: ErrInvalidRequestFormat},
 		{Test: api.ParamNotFoundDef("{id}"), Err: ErrTokenNotFound},
 	})
-	return err
+	return errs
 }
 
 func decode(resp *http.Response, target interface{}) error {

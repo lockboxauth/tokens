@@ -189,7 +189,9 @@ type Dependencies struct {
 // ErrInvalidToken if not.
 func (d Dependencies) Validate(ctx context.Context, id, value string) (RefreshToken, error) {
 	token, err := d.Storer.GetToken(ctx, id)
-	if err != nil {
+	if err == ErrTokenNotFound {
+		return RefreshToken{}, ErrInvalidToken
+	} else if err != nil {
 		return RefreshToken{}, err
 	}
 	salt, err := hex.DecodeString(token.HashSalt)

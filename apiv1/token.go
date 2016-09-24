@@ -25,12 +25,12 @@ type RefreshToken struct {
 // RefreshTokenChange is a representation of the tokens.RefreshTokenChange type.
 // It is toold towards being used in requests and responses for apiv1.
 type RefreshTokenChange struct {
-	ID        string
-	ProfileID string
-	ClientID  string
+	ID        string `json:"id"`
+	ProfileID string `json:"profileID"`
+	ClientID  string `json:"clientID"`
 
-	Revoked *bool
-	Used    *bool
+	Revoked *bool `json:"revoked"`
+	Used    *bool `json:"used"`
 }
 
 func coreToken(token RefreshToken) tokens.RefreshToken {

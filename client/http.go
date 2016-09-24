@@ -164,6 +164,7 @@ func (a *APIManager) Validate(ctx context.Context, token string) []error {
 	errs := api.DecodeErrors(resp, r.Errors, []api.ErrorDef{
 		{Test: api.ActOfGodDef, Err: ErrServerError},
 		{Test: api.ErrDefCodeParamSlug(http.StatusBadRequest, "", api.RequestErrInvalidValue), Err: ErrInvalidTokenString},
+		{Test: api.ErrDefCodeParamSlug(http.StatusBadRequest, "", api.RequestErrConflict), Err: ErrInvalidTokenString},
 	})
 	if len(errs) > 0 {
 		return errs

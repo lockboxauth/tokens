@@ -1,6 +1,7 @@
 package apiv1
 
 import (
+	"log"
 	"net/http"
 
 	"code.impractical.co/tokens"
@@ -23,13 +24,13 @@ func (a APIv1) handleInsertToken(w http.ResponseWriter, r *http.Request) {
 	var body RefreshToken
 	err := api.Decode(r, &body)
 	if err != nil {
-		api.Encode(w, r, http.StatusBadRequest, api.InvalidFormatError)
+		api.Encode(w, r, http.StatusBadRequest, Response{Errors: api.InvalidFormatError})
 		return
 	}
 	token := coreToken(body)
 	token, err = tokens.FillTokenDefaults(token)
 	if err != nil {
-		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
+		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
 	var reqErrs []api.RequestError
@@ -49,14 +50,14 @@ func (a APIv1) handleInsertToken(w http.ResponseWriter, r *http.Request) {
 	err = a.Storer.CreateToken(r.Context(), token)
 	if err != nil {
 		if err == tokens.ErrTokenAlreadyExists {
-			api.Encode(w, r, http.StatusBadRequest, []api.RequestError{{Field: "/id", Slug: api.RequestErrConflict}})
+			api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Field: "/id", Slug: api.RequestErrConflict}}})
 			return
 		}
 		if err == tokens.ErrTokenHashAlreadyExists {
-			api.Encode(w, r, http.StatusBadRequest, []api.RequestError{{Field: "/value", Slug: api.RequestErrConflict}})
+			api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Field: "/value", Slug: api.RequestErrConflict}}})
 			return
 		}
-		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
+		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
 	api.Encode(w, r, http.StatusCreated, Response{Tokens: []RefreshToken{apiToken(token)}})
@@ -73,7 +74,7 @@ func (a APIv1) handleGetToken(w http.ResponseWriter, r *http.Request) {
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrNotFound, Param: "{id}"}}})
 		return
 	} else if err != nil {
-		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
+		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
 	api.Encode(w, r, http.StatusOK, Response{Tokens: []RefreshToken{apiToken(token)}})
@@ -91,18 +92,21 @@ func (a APIv1) handlePatchToken(w http.ResponseWriter, r *http.Request) {
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrNotFound, Param: "{id}"}}})
 		return
 	} else if err != nil {
-		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
+		log.Printf("Error retrieving token: %+v\n", err)
+		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
 	err = api.Decode(r, &body)
 	if err != nil {
-		api.Encode(w, r, http.StatusBadRequest, api.InvalidFormatError)
+		api.Encode(w, r, http.StatusBadRequest, Response{Errors: api.InvalidFormatError})
 		return
 	}
+	body.ID = id
 	change := coreChange(body)
 	err = a.Storer.UpdateTokens(r.Context(), change)
 	if err != nil {
-		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
+		log.Printf("Error updating tokens: %+v\n", err)
+		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
 	token = tokens.ApplyChange(token, change)
@@ -118,7 +122,7 @@ func (a APIv1) handlePostToken(w http.ResponseWriter, r *http.Request) {
 	}
 	err := api.Decode(r, &body)
 	if err != nil {
-		api.Encode(w, r, http.StatusBadRequest, api.InvalidFormatError)
+		api.Encode(w, r, http.StatusBadRequest, Response{Errors: api.InvalidFormatError})
 		return
 	}
 	token, err := a.Validate(r.Context(), id, body.Value)
@@ -126,7 +130,11 @@ func (a APIv1) handlePostToken(w http.ResponseWriter, r *http.Request) {
 		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrInvalidValue}}})
 		return
 	} else if err != nil {
-		api.Encode(w, r, http.StatusInternalServerError, api.ActOfGodError)
+		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
+		return
+	}
+	if token.Used || token.Revoked {
+		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrConflict}}})
 		return
 	}
 	api.Encode(w, r, http.StatusOK, Response{Tokens: []RefreshToken{apiToken(token)}})

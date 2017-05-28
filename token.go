@@ -4,21 +4,21 @@ package tokens
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
+	"crypto/rsa"
 	"errors"
+	"log"
 	"time"
 
-	"darlinggo.co/hash"
-
 	"code.impractical.co/pqarrays"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/pborman/uuid"
 )
 
 const (
 	// NumTokenResults is the number of Tokens to retrieve when listing Tokens.
 	NumTokenResults = 25
+
+	refreshLength = time.Duration(time.Hour * 24 * 14)
 )
 
 var (
@@ -29,35 +29,22 @@ var (
 	ErrInvalidToken = errors.New("invalid token")
 	// ErrTokenAlreadyExists is returned when a Token is created, but its ID already exists in the Storer.
 	ErrTokenAlreadyExists = errors.New("token already exists")
-	// ErrTokenHashAlreadyExists is returned when the combination of a Token's Hash, HashSalt, and
-	// HashIterations properties all exists in the database.
-	ErrTokenHashAlreadyExists = errors.New("token hash, salt, and iteration combination already exists")
-
-	calculatedHashIterations = 0
+	// ErrTokenRevoked is returned when the Token identified by Validate has been revoked.
+	ErrTokenRevoked = errors.New("token revoked")
+	// ErrTokenUsed is returned when the Token identified by Validate has already been used.
+	ErrTokenUsed = errors.New("token used")
 )
-
-func init() {
-	iters, err := hash.CalculateIterations(sha256.New)
-	if err != nil {
-		panic(err)
-	}
-	calculatedHashIterations = iters
-}
 
 // RefreshToken represents a refresh token that can be used to obtain a new access token.
 type RefreshToken struct {
-	ID             string `datastore:"-"`
-	Value          string `datastore:"-" sql_column:"-"`
-	Hash           string
-	HashIterations int
-	HashSalt       string
-	CreatedAt      time.Time
-	CreatedFrom    string
-	Scopes         pqarrays.StringArray
-	ProfileID      string
-	ClientID       string
-	Revoked        bool
-	Used           bool
+	ID          string
+	CreatedAt   time.Time
+	CreatedFrom string
+	Scopes      pqarrays.StringArray
+	ProfileID   string
+	ClientID    string
+	Revoked     bool
+	Used        bool
 }
 
 // RefreshTokenChange represents a change to one or more RefreshTokens. If ID is set, only the RefreshToken
@@ -102,56 +89,12 @@ type Storer interface {
 	GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error)
 }
 
-// GenerateTokenValue returns a cryptographically random value that can be used as a RefreshToken's Value property.
-// If the cryptographically secure source of randomness can't be read from, an error is returned.
-func GenerateTokenValue() (string, error) {
-	b := make([]byte, 32)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
-}
-
-// GenerateTokenHash returns a cryptographically secure hash for the passed value, using the specified number of
-// iterations to generate the hash. hash.CalculateIterations is a good way to arrive at this number for any given
-// machine. It returns the hash and the salt used to generate the hash. The salt is a set of cryptographically
-// secure random bytes; if the source of cryptographic randomness can't be read from, an error is returned.
-func GenerateTokenHash(value string, iters int) (string, string, error) {
-	if iters == 0 {
-		return "", "", errors.New("hash iterations set to 0, refusing to generate hash")
-	}
-	hashBytes, saltBytes, err := hash.Create(sha256.New, iters, []byte(value))
-	if err != nil {
-		return "", "", err
-	}
-	return hex.EncodeToString(hashBytes), hex.EncodeToString(saltBytes), nil
-}
-
 // FillTokenDefaults returns a copy of `token` with all empty properties that have default values, like ID
 // and CreatedAt set to their default values.
 func FillTokenDefaults(token RefreshToken) (RefreshToken, error) {
 	res := token
 	if res.ID == "" {
 		res.ID = uuid.NewRandom().String()
-	}
-	var valueChanged bool
-	if res.Value == "" {
-		value, err := GenerateTokenValue()
-		if err != nil {
-			return res, err
-		}
-		res.Value = value
-		valueChanged = true
-	}
-	if res.Hash == "" || res.HashSalt == "" || res.HashIterations == 0 || valueChanged {
-		hash, salt, err := GenerateTokenHash(res.Value, calculatedHashIterations)
-		if err != nil {
-			return res, err
-		}
-		res.HashSalt = salt
-		res.Hash = hash
-		res.HashIterations = calculatedHashIterations
 	}
 	if res.CreatedAt.IsZero() {
 		res.CreatedAt = time.Now()
@@ -182,29 +125,49 @@ func (r RefreshTokensByCreatedAt) Swap(i, j int) {
 // Dependencies manages the dependency injection for the tokens package. All its properties are required for
 // a Dependencies struct to be valid.
 type Dependencies struct {
-	Storer Storer // Storer is the Storer to use when retrieving, setting, or removing RefreshTokens.
+	Storer        Storer // Storer is the Storer to use when retrieving, setting, or removing RefreshTokens.
+	JWTPrivateKey *rsa.PrivateKey
+	JWTPublicKey  *rsa.PublicKey
+	Log           *log.Logger
 }
 
 // Validate checks that the token with the given ID has the given value, and returns an
 // ErrInvalidToken if not.
-func (d Dependencies) Validate(ctx context.Context, id, value string) (RefreshToken, error) {
-	token, err := d.Storer.GetToken(ctx, id)
+func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken, error) {
+	tok, err := jwt.Parse(jwtVal, func(token *jwt.Token) (interface{}, error) {
+		return d.JWTPublicKey, nil
+	})
+	if err != nil {
+		d.Log.Printf("Error validating token: %+v\n", err)
+		return RefreshToken{}, ErrInvalidToken
+	}
+	claims, ok := tok.Claims.(*jwt.StandardClaims)
+	if !ok {
+		return RefreshToken{}, ErrInvalidToken
+	}
+	token, err := d.Storer.GetToken(ctx, claims.Id)
 	if err == ErrTokenNotFound {
 		return RefreshToken{}, ErrInvalidToken
 	} else if err != nil {
 		return RefreshToken{}, err
 	}
-	salt, err := hex.DecodeString(token.HashSalt)
-	if err != nil {
-		return RefreshToken{}, err
+	if token.Revoked {
+		return RefreshToken{}, ErrTokenRevoked
 	}
-	hashVal, err := hex.DecodeString(token.Hash)
-	if err != nil {
-		return RefreshToken{}, err
-	}
-	candidate := hash.Check(sha256.New, token.HashIterations, []byte(value), salt)
-	if !hash.Compare(candidate, hashVal) {
-		return RefreshToken{}, ErrInvalidToken
+	if token.Used {
+		return RefreshToken{}, ErrTokenUsed
 	}
 	return token, nil
+}
+
+func (d Dependencies) CreateJWT(ctx context.Context, token RefreshToken) (string, error) {
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, &jwt.StandardClaims{
+		Audience:  token.ClientID,
+		ExpiresAt: token.CreatedAt.UTC().Add(refreshLength).Unix(),
+		Id:        token.ID,
+		IssuedAt:  token.CreatedAt.UTC().Unix(),
+		Issuer:    token.CreatedFrom,
+		NotBefore: token.CreatedAt.UTC().Add(-1 * time.Hour).Unix(),
+		Subject:   token.ProfileID,
+	}).SignedString(d.JWTPrivateKey)
 }

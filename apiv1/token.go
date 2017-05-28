@@ -36,7 +36,6 @@ type RefreshTokenChange struct {
 func coreToken(token RefreshToken) tokens.RefreshToken {
 	return tokens.RefreshToken{
 		ID:          token.ID,
-		Value:       token.Value,
 		CreatedAt:   token.CreatedAt,
 		CreatedFrom: token.CreatedFrom,
 		Scopes:      pqarrays.StringArray(token.Scopes),
@@ -50,7 +49,6 @@ func coreToken(token RefreshToken) tokens.RefreshToken {
 func apiToken(token tokens.RefreshToken) RefreshToken {
 	return RefreshToken{
 		ID:          token.ID,
-		Value:       token.Value,
 		CreatedAt:   token.CreatedAt,
 		CreatedFrom: token.CreatedFrom,
 		Scopes:      []string(token.Scopes),

@@ -2,6 +2,7 @@
 // sources:
 // sql/20160227_init.sql
 // sql/20160522_hashing.sql
+// sql/20161126_jwt.sql
 // DO NOT EDIT!
 
 package tokens
@@ -109,6 +110,26 @@ func sql20160522_hashingSql() (*asset, error) {
 	return a, nil
 }
 
+var _sql20161126_jwtSql = []byte("\x1f\x8b\x08\x00\x00\x09\x6e\x88\x00\xff\x9c\x90\xcd\x4e\x03\x21\x14\x46\xd7\xe5\x29\xbe\x5d\xdb\x38\x4d\x5c\x18\x37\x5d\x61\xa1\x91\x04\x19\x65\xc0\xb8\x6b\x58\x10\x4b\xac\x8c\x0e\x8c\xbe\xbe\x19\xff\xe6\x47\x8d\x49\xf7\xe7\xdc\x7b\xee\x5d\xad\x70\xf2\x18\xee\x1b\x97\x3d\x58\xfd\x1a\x09\x95\x86\x6b\x18\x7a\x21\x39\x72\xfd\xe0\x63\x02\x65\x0c\x9b\x52\xda\x2b\x85\xbd\x4b\x7b\xdc\x52\xbd\xb9\xa4\x7a\x71\x7e\xb6\x84\x2a\x0d\x94\x95\x12\x8c\x6f\xa9\x95\x06\xf3\x79\x41\x66\x33\x60\x6a\xed\x92\x3b\xe4\x23\xd5\x90\x7d\xe3\x72\xa8\x63\x82\x50\xe6\xa7\x78\x3a\xf2\x54\x65\x34\xed\xb8\x36\x86\xe7\xd6\xef\x5e\xdc\xa1\xf5\xb0\x4a\xdc\x58\xbe\xe8\xe6\x15\x7d\x50\x31\x5d\xb0\x5c\x13\x32\xfc\x89\x7d\xfa\xed\x23\x4c\x97\xd7\x5f\x85\x62\x0b\x7e\x27\x2a\x53\xbd\x8f\xfa\x2c\xf9\x1b\xf8\x58\xfb\x2f\xd5\x17\x8d\xd9\xef\xe3\x7a\x7e\x78\xe6\x9a\xbc\x05\x00\x00\xff\xff\xba\xad\x74\xff\xd1\x01\x00\x00")
+
+func sql20161126_jwtSqlBytes() ([]byte, error) {
+	return bindataRead(
+		_sql20161126_jwtSql,
+		"sql/20161126_jwt.sql",
+	)
+}
+
+func sql20161126_jwtSql() (*asset, error) {
+	bytes, err := sql20161126_jwtSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "sql/20161126_jwt.sql", size: 465, mode: os.FileMode(420), modTime: time.Unix(1480166638, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -163,6 +184,7 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"sql/20160227_init.sql": sql20160227_initSql,
 	"sql/20160522_hashing.sql": sql20160522_hashingSql,
+	"sql/20161126_jwt.sql": sql20161126_jwtSql,
 }
 
 // AssetDir returns the file names below a certain
@@ -208,6 +230,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"sql": &bintree{nil, map[string]*bintree{
 		"20160227_init.sql": &bintree{sql20160227_initSql, map[string]*bintree{}},
 		"20160522_hashing.sql": &bintree{sql20160522_hashingSql, map[string]*bintree{}},
+		"20161126_jwt.sql": &bintree{sql20161126_jwtSql, map[string]*bintree{}},
 	}},
 }}
 

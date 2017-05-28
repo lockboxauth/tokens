@@ -83,8 +83,6 @@ func (p Postgres) CreateToken(ctx context.Context, token RefreshToken) error {
 	if e, ok := err.(*pq.Error); ok {
 		if e.Constraint == "tokens_pkey" {
 			err = ErrTokenAlreadyExists
-		} else if e.Constraint == "unique_value" {
-			err = ErrTokenHashAlreadyExists
 		}
 	}
 	return err

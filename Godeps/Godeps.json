@@ -37,6 +37,11 @@
 			"Rev": "18538a81ef9aaa907d1af48c005928111aba110d"
 		},
 		{
+			"ImportPath": "github.com/dgrijalva/jwt-go",
+			"Comment": "v3.0.0-10-g9ed569b",
+			"Rev": "9ed569b5d1ac936e6494082958d63a6aa4fff99a"
+		},
+		{
 			"ImportPath": "github.com/hashicorp/errwrap",
 			"Rev": "7554cd9344cec97297fa6649b055a8c98c2a1e55"
 		},

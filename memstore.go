@@ -3,23 +3,20 @@ package tokens
 import (
 	"context"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 )
 
 // Memstore is an in-memory implementation of the Storer interface, for use in testing.
 type Memstore struct {
-	tokens      map[string]RefreshToken
-	tokenHashes map[string]struct{}
-	lock        sync.RWMutex
+	tokens map[string]RefreshToken
+	lock   sync.RWMutex
 }
 
 // NewMemstore returns an instance of Memstore that is ready to be used as a Storer.
 func NewMemstore() *Memstore {
 	return &Memstore{
-		tokens:      map[string]RefreshToken{},
-		tokenHashes: map[string]struct{}{},
+		tokens: map[string]RefreshToken{},
 	}
 }
 
@@ -47,13 +44,7 @@ func (m *Memstore) CreateToken(ctx context.Context, token RefreshToken) error {
 	if ok {
 		return ErrTokenAlreadyExists
 	}
-	_, ok = m.tokenHashes[token.Hash+":"+token.HashSalt+":"+strconv.Itoa(token.HashIterations)]
-	if ok {
-		return ErrTokenHashAlreadyExists
-	}
-	token.Value = ""
 	m.tokens[token.ID] = token
-	m.tokenHashes[token.Hash+":"+token.HashSalt+":"+strconv.Itoa(token.HashIterations)] = struct{}{}
 
 	return nil
 }

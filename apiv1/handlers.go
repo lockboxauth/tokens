@@ -1,7 +1,6 @@
 package apiv1
 
 import (
-	"log"
 	"net/http"
 
 	"code.impractical.co/tokens"
@@ -53,10 +52,6 @@ func (a APIv1) handleInsertToken(w http.ResponseWriter, r *http.Request) {
 			api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Field: "/id", Slug: api.RequestErrConflict}}})
 			return
 		}
-		if err == tokens.ErrTokenHashAlreadyExists {
-			api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Field: "/value", Slug: api.RequestErrConflict}}})
-			return
-		}
 		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
@@ -92,7 +87,7 @@ func (a APIv1) handlePatchToken(w http.ResponseWriter, r *http.Request) {
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrNotFound, Param: "{id}"}}})
 		return
 	} else if err != nil {
-		log.Printf("Error retrieving token: %+v\n", err)
+		a.Log.Printf("Error retrieving token: %+v\n", err)
 		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
@@ -105,7 +100,7 @@ func (a APIv1) handlePatchToken(w http.ResponseWriter, r *http.Request) {
 	change := coreChange(body)
 	err = a.Storer.UpdateTokens(r.Context(), change)
 	if err != nil {
-		log.Printf("Error updating tokens: %+v\n", err)
+		a.Log.Printf("Error updating tokens: %+v\n", err)
 		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
@@ -114,7 +109,7 @@ func (a APIv1) handlePatchToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a APIv1) handlePostToken(w http.ResponseWriter, r *http.Request) {
-	var body RefreshToken
+	var body string
 	id := trout.RequestVars(r).Get("id")
 	if id == "" {
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrMissing, Param: "{id}"}}})
@@ -125,16 +120,19 @@ func (a APIv1) handlePostToken(w http.ResponseWriter, r *http.Request) {
 		api.Encode(w, r, http.StatusBadRequest, Response{Errors: api.InvalidFormatError})
 		return
 	}
-	token, err := a.Validate(r.Context(), id, body.Value)
+	token, err := a.Validate(r.Context(), body)
 	if err == tokens.ErrInvalidToken {
-		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrInvalidValue}}})
+		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrInvalidValue, Field: "/"}}})
+		return
+	} else if err == tokens.ErrTokenUsed || err == tokens.ErrTokenRevoked {
+		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrConflict, Field: "/"}}})
 		return
 	} else if err != nil {
 		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
-	if token.Used || token.Revoked {
-		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrConflict}}})
+	if id != token.ID {
+		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrInvalidValue, Param: "{id"}}})
 		return
 	}
 	api.Encode(w, r, http.StatusOK, Response{Tokens: []RefreshToken{apiToken(token)}})

@@ -1,9 +1,11 @@
-package tokens
+package storers
 
 import (
 	"context"
 	"database/sql"
 	"time"
+
+	"code.impractical.co/tokens"
 
 	"darlinggo.co/pan"
 
@@ -21,33 +23,27 @@ func NewPostgres(ctx context.Context, db *sql.DB) (Postgres, error) {
 	return Postgres{db: db}, nil
 }
 
-// GetSQLTableName returns the name of the PostgreSQL table RefreshTokens will be stored
-// in. It is required for use with pan.
-func (t RefreshToken) GetSQLTableName() string {
-	return "tokens"
-}
-
 func getTokenSQL(ctx context.Context, token string) *pan.Query {
-	var t RefreshToken
+	var t tokens.RefreshToken
 	query := pan.New("SELECT " + pan.Columns(t).String() + " FROM " + pan.Table(t))
 	query.Where()
 	query.Comparison(t, "ID", "=", token)
 	return query.Flush(" ")
 }
 
-// GetToken retrieves the RefreshToken with an ID matching `token` from Postgres. If no
-// RefreshToken has that ID, an ErrTokenNotFound error is returned.
-func (p Postgres) GetToken(ctx context.Context, token string) (RefreshToken, error) {
+// GetToken retrieves the tokens.RefreshToken with an ID matching `token` from Postgres. If no
+// tokens.RefreshToken has that ID, an ErrTokenNotFound error is returned.
+func (p Postgres) GetToken(ctx context.Context, token string) (tokens.RefreshToken, error) {
 	query := getTokenSQL(ctx, token)
 	queryStr, err := query.PostgreSQLString()
 	if err != nil {
-		return RefreshToken{}, err
+		return tokens.RefreshToken{}, err
 	}
 	rows, err := p.db.Query(queryStr, query.Args()...)
 	if err != nil {
-		return RefreshToken{}, err
+		return tokens.RefreshToken{}, err
 	}
-	var t RefreshToken
+	var t tokens.RefreshToken
 	var found bool
 	for rows.Next() {
 		err := pan.Unmarshal(rows, &t)
@@ -60,20 +56,20 @@ func (p Postgres) GetToken(ctx context.Context, token string) (RefreshToken, err
 		return t, err
 	}
 	if !found {
-		return t, ErrTokenNotFound
+		return t, tokens.ErrTokenNotFound
 	}
 	return t, nil
 }
 
-func createTokenSQL(token RefreshToken) *pan.Query {
+func createTokenSQL(token tokens.RefreshToken) *pan.Query {
 	query := pan.Insert(token)
 	return query.Flush(" ")
 }
 
-// CreateToken inserts the passed RefreshToken into Postgres. If a RefreshToken
+// CreateToken inserts the passed tokens.RefreshToken into Postgres. If a tokens.RefreshToken
 // with the same ID already exists in Postgres, an ErrTokenAlreadyExists error
-// will be returned, and the RefreshToken will not be inserted.
-func (p Postgres) CreateToken(ctx context.Context, token RefreshToken) error {
+// will be returned, and the tokens.RefreshToken will not be inserted.
+func (p Postgres) CreateToken(ctx context.Context, token tokens.RefreshToken) error {
 	query := createTokenSQL(token)
 	queryStr, err := query.PostgreSQLString()
 	if err != nil {
@@ -82,14 +78,14 @@ func (p Postgres) CreateToken(ctx context.Context, token RefreshToken) error {
 	_, err = p.db.Exec(queryStr, query.Args()...)
 	if e, ok := err.(*pq.Error); ok {
 		if e.Constraint == "tokens_pkey" {
-			err = ErrTokenAlreadyExists
+			err = tokens.ErrTokenAlreadyExists
 		}
 	}
 	return err
 }
 
-func updateTokensSQL(ctx context.Context, change RefreshTokenChange) *pan.Query {
-	var t RefreshToken
+func updateTokensSQL(ctx context.Context, change tokens.RefreshTokenChange) *pan.Query {
+	var t tokens.RefreshToken
 	query := pan.New("UPDATE " + pan.Table(t) + " SET ")
 	if change.Revoked != nil {
 		query.Comparison(t, "Revoked", "=", change.Revoked)
@@ -110,9 +106,9 @@ func updateTokensSQL(ctx context.Context, change RefreshTokenChange) *pan.Query 
 	return query.Flush(" AND ")
 }
 
-// UpdateTokens applies `change` to all the RefreshTokens in Postgres that match the ID,
+// UpdateTokens applies `change` to all the tokens.RefreshTokens in Postgres that match the ID,
 // ProfileID, or ClientID constraints of `change`.
-func (p Postgres) UpdateTokens(ctx context.Context, change RefreshTokenChange) error {
+func (p Postgres) UpdateTokens(ctx context.Context, change tokens.RefreshTokenChange) error {
 	if change.IsEmpty() {
 		return nil
 	}
@@ -126,7 +122,7 @@ func (p Postgres) UpdateTokens(ctx context.Context, change RefreshTokenChange) e
 }
 
 func getTokensByProfileIDSQL(ctx context.Context, profileID string, since, before time.Time) *pan.Query {
-	var t RefreshToken
+	var t tokens.RefreshToken
 	query := pan.New("SELECT " + pan.Columns(t).String() + " FROM " + pan.Table(t))
 	query.Where()
 	query.Comparison(t, "ProfileID", "=", profileID)
@@ -138,37 +134,37 @@ func getTokensByProfileIDSQL(ctx context.Context, profileID string, since, befor
 	}
 	query.Flush(" AND ")
 	query.OrderByDesc(pan.Column(t, "CreatedAt"))
-	query.Limit(NumTokenResults)
+	query.Limit(tokens.NumTokenResults)
 	return query.Flush(" ")
 }
 
-// GetTokensByProfileID retrieves up to NumTokenResults RefreshTokens from Postgres. Only
-// RefreshTokens with a ProfileID property matching `profileID` will be returned. If `since`
-// is non-empty, only RefreshTokens with a CreatedAt property that is after `since` will be
-// returned. If `before` is non-empty, only RefreshTokens with a CreatedAt property that is
-// before `before` will be returned. RefreshTokens will be sorted by their CreatedAt property,
+// GetTokensByProfileID retrieves up to NumTokenResults tokens.RefreshTokens from Postgres. Only
+// tokens.RefreshTokens with a ProfileID property matching `profileID` will be returned. If `since`
+// is non-empty, only tokens.RefreshTokens with a CreatedAt property that is after `since` will be
+// returned. If `before` is non-empty, only tokens.RefreshTokens with a CreatedAt property that is
+// before `before` will be returned. tokens.RefreshTokens will be sorted by their CreatedAt property,
 // with the most recent coming first.
-func (p Postgres) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error) {
+func (p Postgres) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]tokens.RefreshToken, error) {
 	query := getTokensByProfileIDSQL(ctx, profileID, since, before)
 	queryStr, err := query.PostgreSQLString()
 	if err != nil {
-		return []RefreshToken{}, err
+		return []tokens.RefreshToken{}, err
 	}
 	rows, err := p.db.Query(queryStr, query.Args()...)
 	if err != nil {
-		return []RefreshToken{}, err
+		return []tokens.RefreshToken{}, err
 	}
-	var tokens []RefreshToken
+	var toks []tokens.RefreshToken
 	for rows.Next() {
-		var token RefreshToken
+		var token tokens.RefreshToken
 		err = pan.Unmarshal(rows, &token)
 		if err != nil {
-			return tokens, err
+			return toks, err
 		}
-		tokens = append(tokens, token)
+		toks = append(toks, token)
 	}
 	if err = rows.Err(); err != nil {
-		return tokens, err
+		return toks, err
 	}
-	return tokens, nil
+	return toks, nil
 }

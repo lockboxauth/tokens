@@ -1,6 +1,10 @@
-package tokens
+package storers
 
-import "context"
+import (
+	"context"
+
+	"code.impractical.co/tokens"
+)
 
 func init() {
 	storerFactories = append(storerFactories, MemstoreFactory{})
@@ -8,7 +12,7 @@ func init() {
 
 type MemstoreFactory struct{}
 
-func (m MemstoreFactory) NewStorer(ctx context.Context) (Storer, error) {
+func (m MemstoreFactory) NewStorer(ctx context.Context) (tokens.Storer, error) {
 	return NewMemstore(), nil
 }
 

@@ -1,6 +1,6 @@
 package tokens
 
-//go:generate go-bindata -pkg $GOPACKAGE -o migrations.go sql/
+//go:generate go-bindata -pkg migrations -o migrations/generated.go sql/
 
 import (
 	"context"
@@ -45,6 +45,12 @@ type RefreshToken struct {
 	ClientID    string
 	Revoked     bool
 	Used        bool
+}
+
+// GetSQLTableName returns the name of the PostgreSQL table RefreshTokens will be stored
+// in. It is required for use with pan.
+func (t RefreshToken) GetSQLTableName() string {
+	return "tokens"
 }
 
 // RefreshTokenChange represents a change to one or more RefreshTokens. If ID is set, only the RefreshToken

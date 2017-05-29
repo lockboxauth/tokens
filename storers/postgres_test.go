@@ -1,4 +1,4 @@
-package tokens
+package storers
 
 import (
 	"context"
@@ -9,6 +9,9 @@ import (
 	"net/url"
 	"os"
 	"sync"
+
+	"code.impractical.co/grants/migrations"
+	"code.impractical.co/tokens"
 
 	"github.com/pborman/uuid"
 	"github.com/rubenv/sql-migrate"
@@ -31,7 +34,7 @@ type PostgresFactory struct {
 	lock      sync.Mutex
 }
 
-func (p *PostgresFactory) NewStorer(ctx context.Context) (Storer, error) {
+func (p *PostgresFactory) NewStorer(ctx context.Context) (tokens.Storer, error) {
 	u, err := url.Parse(os.Getenv("PG_TEST_DB"))
 	if err != nil {
 		log.Printf("Error parsing PG_TEST_DB as a URL: %+v\n", err)
@@ -64,8 +67,8 @@ func (p *PostgresFactory) NewStorer(ctx context.Context) (Storer, error) {
 	p.lock.Unlock()
 
 	migrations := &migrate.AssetMigrationSource{
-		Asset:    Asset,
-		AssetDir: AssetDir,
+		Asset:    migrations.Asset,
+		AssetDir: migrations.AssetDir,
 		Dir:      "sql",
 	}
 	_, err = migrate.Exec(newConn, "postgres", migrations, migrate.Up)

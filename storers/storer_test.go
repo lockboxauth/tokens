@@ -1,4 +1,4 @@
-package tokens
+package storers
 
 import (
 	"context"
@@ -8,6 +8,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"code.impractical.co/tokens"
 
 	"github.com/pborman/uuid"
 )
@@ -19,13 +21,13 @@ const (
 )
 
 type StorerFactory interface {
-	NewStorer(ctx context.Context) (Storer, error)
+	NewStorer(ctx context.Context) (tokens.Storer, error)
 	TeardownStorer() error
 }
 
 var storerFactories []StorerFactory
 
-func compareRefreshTokens(token1, token2 RefreshToken) (success bool, field string, val1, val2 interface{}) {
+func compareRefreshTokens(token1, token2 tokens.RefreshToken) (success bool, field string, val1, val2 interface{}) {
 	if token1.ID != token2.ID {
 		return false, "ID", token1.ID, token2.ID
 	}
@@ -80,7 +82,7 @@ func TestCreateAndGetToken(t *testing.T) {
 		}
 		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
 			storer, ctx := storer, ctx
-			token := RefreshToken{
+			token := tokens.RefreshToken{
 				ID: uuid.NewRandom().String(),
 				// Postgres only stores times to the millisecond, so we have to round it going in
 				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
@@ -120,7 +122,7 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
 			storer, ctx := storer, ctx
 
-			token := RefreshToken{
+			token := tokens.RefreshToken{
 				ID: uuid.NewRandom().String(),
 				// Postgres only stores times to the millisecond, so we have to round it going in
 				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
@@ -138,8 +140,8 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 			}
 
 			err = storer.CreateToken(ctx, token)
-			if err != ErrTokenAlreadyExists {
-				t.Errorf("Expected ErrTokenAlreadyExists, %T returned %+v\n", storer, err)
+			if err != tokens.ErrTokenAlreadyExists {
+				t.Errorf("Expected tokens.ErrTokenAlreadyExists, %T returned %+v\n", storer, err)
 			}
 		})
 	}
@@ -157,8 +159,8 @@ func TestGetTokenErrTokenNotFound(t *testing.T) {
 			storer, ctx := storer, ctx
 
 			token, err := storer.GetToken(ctx, uuid.NewRandom().String())
-			if err != ErrTokenNotFound {
-				t.Errorf("Expected ErrTokenNotFound, %T returned %+v and %+v\n", storer, token, err)
+			if err != tokens.ErrTokenNotFound {
+				t.Errorf("Expected tokens.ErrTokenNotFound, %T returned %+v and %+v\n", storer, token, err)
 			}
 		})
 	}
@@ -175,7 +177,7 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
 			storer, ctx := storer, ctx
 
-			token := RefreshToken{
+			token := tokens.RefreshToken{
 				// Postgres only stores times to the millisecond, so we have to round it going in
 				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 				CreatedFrom: fmt.Sprintf("test case for %T", storer),
@@ -191,7 +193,7 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 					i := i
 					token := token
 					t.Parallel()
-					var change RefreshTokenChange
+					var change tokens.RefreshTokenChange
 					var revoked, used bool
 
 					token.ID = uuid.NewRandom().String()
@@ -210,10 +212,10 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 						change.Used = &used
 						expectation.Used = used
 					}
-					result = ApplyChange(result, change)
+					result = tokens.ApplyChange(result, change)
 					ok, field, expectedVal, resultVal := compareRefreshTokens(expectation, result)
 					if !ok {
-						t.Errorf("Expected %s of change %d to be %v, got %v after applying RefreshTokenChange %+v\n", field, i, expectedVal, resultVal, change)
+						t.Errorf("Expected %s of change %d to be %v, got %v after applying tokens.RefreshTokenChange %+v\n", field, i, expectedVal, resultVal, change)
 					}
 
 					err := storer.CreateToken(ctx, token)
@@ -253,7 +255,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 			user1 := uuid.NewRandom().String()
 			user2 := uuid.NewRandom().String()
 
-			tokens := []RefreshToken{
+			toks := []tokens.RefreshToken{
 				{
 					ID: uuid.NewRandom().String(),
 					// Postgres only stores times to the millisecond, so we have to round it going in
@@ -284,14 +286,14 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				},
 			}
 
-			for _, token := range tokens {
+			for _, token := range toks {
 				err = storer.CreateToken(ctx, token)
 				if err != nil {
 					t.Errorf("Error creating token %+v in %T: %+v\n", token, storer, err)
 				}
 			}
 
-			expectations := []RefreshToken{tokens[1], tokens[0]}
+			expectations := []tokens.RefreshToken{toks[1], toks[0]}
 
 			results, err := storer.GetTokensByProfileID(ctx, user1, time.Time{}, time.Time{})
 			if err != nil {
@@ -310,7 +312,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				}
 			}
 
-			expectations = []RefreshToken{tokens[0]}
+			expectations = []tokens.RefreshToken{toks[0]}
 
 			results, err = storer.GetTokensByProfileID(ctx, user1, time.Time{}, time.Now())
 			if err != nil {
@@ -328,7 +330,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				}
 			}
 
-			expectations = []RefreshToken{tokens[1]}
+			expectations = []tokens.RefreshToken{toks[1]}
 
 			results, err = storer.GetTokensByProfileID(ctx, user1, time.Now(), time.Time{})
 			if err != nil {
@@ -346,7 +348,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				}
 			}
 
-			expectations = []RefreshToken{tokens[2]}
+			expectations = []tokens.RefreshToken{toks[2]}
 
 			results, err = storer.GetTokensByProfileID(ctx, user2, time.Time{}, time.Time{})
 			if err != nil {
@@ -364,7 +366,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				}
 			}
 
-			expectations = []RefreshToken{}
+			expectations = []tokens.RefreshToken{}
 
 			results, err = storer.GetTokensByProfileID(ctx, uuid.NewRandom().String(), time.Time{}, time.Time{})
 			if err != nil {

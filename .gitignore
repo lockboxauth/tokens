@@ -1,4 +1,4 @@
 cover.out
-coverage
+.cover-profiles
 tokensd/tokensd
 tokensd/sql

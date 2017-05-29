@@ -5,7 +5,7 @@
 // sql/20161126_jwt.sql
 // DO NOT EDIT!
 
-package tokens
+package migrations
 
 import (
 	"bytes"

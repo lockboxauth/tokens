@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,14 +47,12 @@ type RequestError struct {
 type UnhandledRequestError RequestError
 
 func (u UnhandledRequestError) Error() string {
-	return fmt.Sprintf("unhandled RequestError %+v", u)
+	return fmt.Sprintf("unhandled RequestError %+v", u.RequestError())
 }
 
 func (u UnhandledRequestError) RequestError() RequestError {
 	return RequestError(u)
 }
-
-type ContextHandler func(context.Context, http.ResponseWriter, *http.Request)
 
 func NegotiateMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -114,12 +111,6 @@ func CORSMiddleware(h http.Handler) http.Handler {
 			return
 		}
 		h.ServeHTTP(w, r)
-	})
-}
-
-func ContextWrapper(c context.Context, handler ContextHandler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handler(c, w, r)
 	})
 }
 

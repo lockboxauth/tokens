@@ -1,7 +1,7 @@
 {
 	"ImportPath": "code.impractical.co/tokens",
-	"GoVersion": "go1.7",
-	"GodepVersion": "v74",
+	"GoVersion": "go1.9",
+	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
 	],
@@ -9,7 +9,7 @@
 		{
 			"ImportPath": "bitbucket.org/ww/goautoneg",
 			"Comment": "null-5",
-			"Rev": "'75cd24fc2f2c2a2088577d12123ddee5f54e0675'"
+			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
 		},
 		{
 			"ImportPath": "code.impractical.co/pqarrays",
@@ -17,52 +17,75 @@
 		},
 		{
 			"ImportPath": "darlinggo.co/api",
-			"Rev": "a928dd89d612f2c055f060cb63d22bb9071538ef"
+			"Rev": "e06603e9dd5340667002ba84a47215fb96ddcb7f"
 		},
 		{
 			"ImportPath": "darlinggo.co/hash",
-			"Rev": "3ecb1d8049fdb265593e2dcd2f76636c306906be"
+			"Rev": "6cc5cf33183ecce96b777c5ddcde6ed7f1af8d40"
 		},
 		{
 			"ImportPath": "darlinggo.co/pan",
-			"Comment": "v0.1.0-1-gfff7af8",
-			"Rev": "fff7af8f1e4c8d005ac22f7ec23e4937cc698a26"
+			"Comment": "v0.1.0-2-g3bc0a62",
+			"Rev": "3bc0a62a10a44c54353e53856185312feb716544"
 		},
 		{
 			"ImportPath": "darlinggo.co/trout",
-			"Rev": "9242b33b192f509746c4777deb72d09c3cfbe8dd"
+			"Comment": "v1.0.0",
+			"Rev": "7578ccb7c179d9df9f342ae16470143f40694a8a"
 		},
 		{
 			"ImportPath": "darlinggo.co/version",
-			"Rev": "18538a81ef9aaa907d1af48c005928111aba110d"
+			"Comment": "v1.0.0-1-gf3ee4b7",
+			"Rev": "f3ee4b785ab6b889b50983a1f34bf1febcaaee32"
+		},
+		{
+			"ImportPath": "github.com/apex/log",
+			"Rev": "8f3a15d95392c8fc202d1e1059f46df21dff2992"
 		},
 		{
 			"ImportPath": "github.com/dgrijalva/jwt-go",
-			"Comment": "v3.0.0-10-g9ed569b",
-			"Rev": "9ed569b5d1ac936e6494082958d63a6aa4fff99a"
+			"Comment": "v3.0.0-20-ga539ee1",
+			"Rev": "a539ee1a749a2b895533f979515ac7e6e0f5b650"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/errwrap",
 			"Rev": "7554cd9344cec97297fa6649b055a8c98c2a1e55"
 		},
 		{
+			"ImportPath": "github.com/hashicorp/go-immutable-radix",
+			"Rev": "afc5a0dbb18abdf82c277a7bc01533e81fa1d6b8"
+		},
+		{
+			"ImportPath": "github.com/hashicorp/go-memdb",
+			"Rev": "98f52f52d7a476958fa9da671354d270c50661a7"
+		},
+		{
 			"ImportPath": "github.com/hashicorp/go-multierror",
 			"Rev": "d30f09973e19c1dfcd120b2d9c4f168e68d6b5d5"
 		},
 		{
+			"ImportPath": "github.com/hashicorp/golang-lru/simplelru",
+			"Rev": "0a025b7e63adc15a622f29b0b2c4c3848243bbf6"
+		},
+		{
 			"ImportPath": "github.com/lib/pq",
-			"Comment": "go1.0-cutoff-84-g3cd0097",
-			"Rev": "3cd0097429be7d611bb644ef85b42bfb102ceea4"
+			"Comment": "go1.0-cutoff-111-g80f8150",
+			"Rev": "80f8150043c80fb52dee6bc863a709cdac7ec8f8"
 		},
 		{
 			"ImportPath": "github.com/lib/pq/oid",
-			"Comment": "go1.0-cutoff-84-g3cd0097",
-			"Rev": "3cd0097429be7d611bb644ef85b42bfb102ceea4"
+			"Comment": "go1.0-cutoff-111-g80f8150",
+			"Rev": "80f8150043c80fb52dee6bc863a709cdac7ec8f8"
 		},
 		{
 			"ImportPath": "github.com/pborman/uuid",
 			"Comment": "v1.0-15-gb984ec7",
 			"Rev": "b984ec7fa9ff9e428bd0cf0abf429384dfbe3e37"
+		},
+		{
+			"ImportPath": "github.com/pkg/errors",
+			"Comment": "v0.8.0-5-gc605e28",
+			"Rev": "c605e284fe17294bda444b34710735b29d1a9d90"
 		},
 		{
 			"ImportPath": "github.com/rubenv/sql-migrate",
@@ -74,7 +97,7 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/pbkdf2",
-			"Rev": "5bcd134fee4dd1475da17714aac19c0aa0142e2f"
+			"Rev": "5f31782cfb2b6373211f8f9fbf31283fa234b570"
 		},
 		{
 			"ImportPath": "gopkg.in/gorp.v1",

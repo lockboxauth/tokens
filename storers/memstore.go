@@ -2,52 +2,90 @@ package storers
 
 import (
 	"context"
+	"errors"
 	"sort"
-	"sync"
 	"time"
+
+	memdb "github.com/hashicorp/go-memdb"
 
 	"code.impractical.co/tokens"
 )
 
+var (
+	schema = &memdb.DBSchema{
+		Tables: map[string]*memdb.TableSchema{
+			"token": &memdb.TableSchema{
+				Name: "token",
+				Indexes: map[string]*memdb.IndexSchema{
+					"id": &memdb.IndexSchema{
+						Name:    "id",
+						Unique:  true,
+						Indexer: &memdb.StringFieldIndex{Field: "ID", Lowercase: true},
+					},
+					"profileID": &memdb.IndexSchema{
+						Name:    "profileID",
+						Unique:  false,
+						Indexer: &memdb.StringFieldIndex{Field: "ProfileID", Lowercase: true},
+					},
+					"clientID": &memdb.IndexSchema{
+						Name:    "clientID",
+						Unique:  false,
+						Indexer: &memdb.StringFieldIndex{Field: "ClientID", Lowercase: true},
+					},
+				},
+			},
+		},
+	}
+)
+
 // Memstore is an in-memory implementation of the Storer interface, for use in testing.
 type Memstore struct {
-	tokens map[string]tokens.RefreshToken
-	lock   sync.RWMutex
+	db *memdb.MemDB
 }
 
 // NewMemstore returns an instance of Memstore that is ready to be used as a Storer.
-func NewMemstore() *Memstore {
-	return &Memstore{
-		tokens: map[string]tokens.RefreshToken{},
+func NewMemstore() (*Memstore, error) {
+	db, err := memdb.NewMemDB(schema)
+	if err != nil {
+		return nil, err
 	}
+	return &Memstore{
+		db: db,
+	}, nil
 }
 
 // GetToken retrieves the tokens.RefreshToken with an ID matching `token` from the Memstore. If
 // no tokens.RefreshToken has that ID, an ErrTokenNotFound error is returned.
 func (m *Memstore) GetToken(ctx context.Context, token string) (tokens.RefreshToken, error) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-
-	result, ok := m.tokens[token]
-	if !ok {
+	txn := m.db.Txn(false)
+	tok, err := txn.First("token", "id", token)
+	if err != nil {
+		return tokens.RefreshToken{}, err
+	}
+	if tok == nil {
 		return tokens.RefreshToken{}, tokens.ErrTokenNotFound
 	}
-	return result, nil
+	return *tok.(*tokens.RefreshToken), nil
 }
 
 // CreateToken inserts the passed tokens.RefreshToken into the Memstore. If a tokens.RefreshToken with
 // the same ID already exists in the Memstore, an ErrTokenAlreadyExists error will be
 // returned, and the tokens.RefreshToken will not be inserted.
 func (m *Memstore) CreateToken(ctx context.Context, token tokens.RefreshToken) error {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
-	_, ok := m.tokens[token.ID]
-	if ok {
+	txn := m.db.Txn(true)
+	defer txn.Abort()
+	exists, err := txn.First("token", "id", token.ID)
+	if err != nil {
+		return err
+	}
+	if exists != nil {
 		return tokens.ErrTokenAlreadyExists
 	}
-	m.tokens[token.ID] = token
-
+	err = txn.Insert("token", &token)
+	if err != nil {
+		return err
+	}
+	txn.Commit()
 	return nil
 }
 
@@ -57,22 +95,37 @@ func (m *Memstore) UpdateTokens(ctx context.Context, change tokens.RefreshTokenC
 	if change.IsEmpty() {
 		return nil
 	}
-	m.lock.Lock()
-	defer m.lock.Unlock()
 
-	for val, t := range m.tokens {
-		if change.ID != "" && change.ID != val {
-			continue
-		}
-		if change.ProfileID != "" && change.ProfileID != t.ProfileID {
-			continue
-		}
-		if change.ClientID != "" && change.ClientID != t.ClientID {
-			continue
-		}
-		t = tokens.ApplyChange(t, change)
-		m.tokens[val] = t
+	txn := m.db.Txn(true)
+	defer txn.Abort()
+
+	var iter memdb.ResultIterator
+	var err error
+	if change.ID != "" {
+		iter, err = txn.Get("token", "id", change.ID)
+	} else if change.ProfileID != "" {
+		iter, err = txn.Get("token", "profileID", change.ProfileID)
+	} else if change.ClientID != "" {
+		iter, err = txn.Get("token", "clientID", change.ClientID)
+	} else {
+		return errors.New("Invalid change; needs an ID, ProfileID, or ClientID.")
 	}
+	if err != nil {
+		return err
+	}
+
+	for {
+		token := iter.Next()
+		if token == nil {
+			break
+		}
+		updated := tokens.ApplyChange(*token.(*tokens.RefreshToken), change)
+		err = txn.Insert("token", &updated)
+		if err != nil {
+			return err
+		}
+	}
+	txn.Commit()
 	return nil
 }
 
@@ -83,22 +136,28 @@ func (m *Memstore) UpdateTokens(ctx context.Context, change tokens.RefreshTokenC
 // will be returned. tokens.RefreshTokens will be sorted by their CreatedAt property, with the most recent
 // coming first.
 func (m *Memstore) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]tokens.RefreshToken, error) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	txn := m.db.Txn(false)
+	defer txn.Abort()
 
 	var toks []tokens.RefreshToken
+	iter, err := txn.Get("token", "profileID", profileID)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, t := range m.tokens {
-		if t.ProfileID != profileID {
+	for {
+		tok := iter.Next()
+		if tok == nil {
+			break
+		}
+		token := *tok.(*tokens.RefreshToken)
+		if !before.IsZero() && !token.CreatedAt.Before(before) {
 			continue
 		}
-		if !before.IsZero() && !t.CreatedAt.Before(before) {
+		if !since.IsZero() && !token.CreatedAt.After(since) {
 			continue
 		}
-		if !since.IsZero() && !t.CreatedAt.After(since) {
-			continue
-		}
-		toks = append(toks, t)
+		toks = append(toks, token)
 	}
 	if len(toks) > tokens.NumTokenResults {
 		toks = toks[:tokens.NumTokenResults]

@@ -23,12 +23,14 @@ func (a APIv1) handleInsertToken(w http.ResponseWriter, r *http.Request) {
 	var body RefreshToken
 	err := api.Decode(r, &body)
 	if err != nil {
+		a.Log.WithError(err).Debug("Error decoding request.")
 		api.Encode(w, r, http.StatusBadRequest, Response{Errors: api.InvalidFormatError})
 		return
 	}
 	token := coreToken(body)
 	token, err = tokens.FillTokenDefaults(token)
 	if err != nil {
+		a.Log.WithError(err).Error("Error filling token defaults.")
 		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
@@ -52,6 +54,7 @@ func (a APIv1) handleInsertToken(w http.ResponseWriter, r *http.Request) {
 			api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Field: "/id", Slug: api.RequestErrConflict}}})
 			return
 		}
+		a.Log.WithError(err).Error("Error creating token.")
 		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
@@ -61,14 +64,17 @@ func (a APIv1) handleInsertToken(w http.ResponseWriter, r *http.Request) {
 func (a APIv1) handleGetToken(w http.ResponseWriter, r *http.Request) {
 	id := trout.RequestVars(r).Get("id")
 	if id == "" {
+		a.Log.WithField("var", "id").Debug("Empty required request variable.")
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrMissing, Param: "{id}"}}})
 		return
 	}
+	log := a.Log.WithField("token_id", id)
 	token, err := a.Storer.GetToken(r.Context(), id)
 	if err == tokens.ErrTokenNotFound {
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrNotFound, Param: "{id}"}}})
 		return
 	} else if err != nil {
+		log.WithError(err).Error("Error retrieving token.")
 		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
@@ -79,20 +85,23 @@ func (a APIv1) handlePatchToken(w http.ResponseWriter, r *http.Request) {
 	var body RefreshTokenChange
 	id := trout.RequestVars(r).Get("id")
 	if id == "" {
+		a.Log.WithField("var", "id").Debug("Empty required request variable.")
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrMissing, Param: "{id}"}}})
 		return
 	}
+	log := a.Log.WithField("token_id", id)
 	token, err := a.Storer.GetToken(r.Context(), id)
 	if err == tokens.ErrTokenNotFound {
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrNotFound, Param: "{id}"}}})
 		return
 	} else if err != nil {
-		a.Log.Printf("Error retrieving token: %+v\n", err)
+		log.WithError(err).Error("Error retrieving token.")
 		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
 	err = api.Decode(r, &body)
 	if err != nil {
+		log.WithError(err).Debug("Error decoding request body.")
 		api.Encode(w, r, http.StatusBadRequest, Response{Errors: api.InvalidFormatError})
 		return
 	}
@@ -100,7 +109,7 @@ func (a APIv1) handlePatchToken(w http.ResponseWriter, r *http.Request) {
 	change := coreChange(body)
 	err = a.Storer.UpdateTokens(r.Context(), change)
 	if err != nil {
-		a.Log.Printf("Error updating tokens: %+v\n", err)
+		log.WithError(err).Error("Error updating token.")
 		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
@@ -112,11 +121,14 @@ func (a APIv1) handlePostToken(w http.ResponseWriter, r *http.Request) {
 	var body string
 	id := trout.RequestVars(r).Get("id")
 	if id == "" {
+		a.Log.WithField("var", "id").Debug("Empty required request variable.")
 		api.Encode(w, r, http.StatusNotFound, Response{Errors: []api.RequestError{{Slug: api.RequestErrMissing, Param: "{id}"}}})
 		return
 	}
+	log := a.Log.WithField("token_id", id)
 	err := api.Decode(r, &body)
 	if err != nil {
+		log.WithError(err).Debug("Error decoding request.")
 		api.Encode(w, r, http.StatusBadRequest, Response{Errors: api.InvalidFormatError})
 		return
 	}
@@ -125,14 +137,17 @@ func (a APIv1) handlePostToken(w http.ResponseWriter, r *http.Request) {
 		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrInvalidValue, Field: "/"}}})
 		return
 	} else if err == tokens.ErrTokenUsed || err == tokens.ErrTokenRevoked {
+		log.WithError(err).Debug("Token revoked or used.")
 		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrConflict, Field: "/"}}})
 		return
 	} else if err != nil {
+		log.WithError(err).Error("Error validating token.")
 		api.Encode(w, r, http.StatusInternalServerError, Response{Errors: api.ActOfGodError})
 		return
 	}
 	if id != token.ID {
-		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrInvalidValue, Param: "{id"}}})
+		log.Debug("Body ID doesn't match URL ID.")
+		api.Encode(w, r, http.StatusBadRequest, Response{Errors: []api.RequestError{{Slug: api.RequestErrInvalidValue, Param: "{id}"}}})
 		return
 	}
 	api.Encode(w, r, http.StatusOK, Response{Tokens: []RefreshToken{apiToken(token)}})

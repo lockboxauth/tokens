@@ -6,8 +6,9 @@ import (
 	"context"
 	"crypto/rsa"
 	"errors"
-	"log"
 	"time"
+
+	"github.com/apex/log"
 
 	"code.impractical.co/pqarrays"
 	jwt "github.com/dgrijalva/jwt-go"
@@ -144,7 +145,7 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 		return d.JWTPublicKey, nil
 	})
 	if err != nil {
-		d.Log.Printf("Error validating token: %+v\n", err)
+		d.Log.WithError(err).Debug("Error validating token.")
 		return RefreshToken{}, ErrInvalidToken
 	}
 	claims, ok := tok.Claims.(*jwt.StandardClaims)

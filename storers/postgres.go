@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"code.impractical.co/tokens"
+	"impractical.co/auth/tokens"
 
 	"darlinggo.co/pan"
 

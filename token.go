@@ -10,9 +10,9 @@ import (
 
 	"github.com/apex/log"
 
-	"code.impractical.co/pqarrays"
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/pborman/uuid"
+	"impractical.co/pqarrays"
 )
 
 const (

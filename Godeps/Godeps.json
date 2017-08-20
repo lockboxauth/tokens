@@ -1,5 +1,5 @@
 {
-	"ImportPath": "code.impractical.co/tokens",
+	"ImportPath": "impractical.co/auth/tokens",
 	"GoVersion": "go1.9",
 	"GodepVersion": "v79",
 	"Packages": [
@@ -12,7 +12,7 @@
 			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
 		},
 		{
-			"ImportPath": "code.impractical.co/pqarrays",
+			"ImportPath": "impractical.co/pqarrays",
 			"Rev": "e02237bd0f22fbf34ddfc1ecdedde1c62124a483"
 		},
 		{

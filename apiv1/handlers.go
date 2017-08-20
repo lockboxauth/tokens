@@ -3,7 +3,7 @@ package apiv1
 import (
 	"net/http"
 
-	"code.impractical.co/tokens"
+	"impractical.co/auth/tokens"
 
 	"darlinggo.co/api"
 	"darlinggo.co/trout"

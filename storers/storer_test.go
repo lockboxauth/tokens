@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"code.impractical.co/tokens"
+	"impractical.co/auth/tokens"
 
 	"github.com/pborman/uuid"
 )

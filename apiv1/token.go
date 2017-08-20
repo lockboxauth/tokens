@@ -3,9 +3,8 @@ package apiv1
 import (
 	"time"
 
-	"code.impractical.co/tokens"
-
-	"code.impractical.co/pqarrays"
+	"impractical.co/auth/tokens"
+	"impractical.co/pqarrays"
 )
 
 // RefreshToken is a representation of the tokens.RefreshToken type. It is

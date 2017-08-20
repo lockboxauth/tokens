@@ -10,8 +10,8 @@ import (
 	"os"
 	"sync"
 
-	"code.impractical.co/tokens"
-	"code.impractical.co/tokens/migrations"
+	"impractical.co/auth/tokens"
+	"impractical.co/auth/tokens/migrations"
 
 	"github.com/pborman/uuid"
 	"github.com/rubenv/sql-migrate"

@@ -13,7 +13,7 @@ import (
 	"impractical.co/auth/tokens"
 	"impractical.co/auth/tokens/migrations"
 
-	"github.com/pborman/uuid"
+	"github.com/hashicorp/go-uuid"
 	"github.com/rubenv/sql-migrate"
 )
 
@@ -44,7 +44,12 @@ func (p *PostgresFactory) NewStorer(ctx context.Context) (tokens.Storer, error) 
 		return nil, errors.New("PG_TEST_DB must begin with postgres://")
 	}
 
-	database := "tokens_test_" + hex.EncodeToString([]byte(uuid.NewRandom()))
+	databaseSuffix, err := uuid.GenerateRandomBytes(6)
+	if err != nil {
+		log.Println("Error generating table suffix: %+v\n", err)
+		return nil, err
+	}
+	database := "tokens_test_" + hex.EncodeToString(databaseSuffix)
 
 	_, err = p.db.Exec("CREATE DATABASE " + database + ";")
 	if err != nil {

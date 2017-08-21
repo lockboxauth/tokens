@@ -8,11 +8,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/apex/log"
-
-	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/pborman/uuid"
 	"impractical.co/pqarrays"
+
+	"github.com/apex/log"
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/hashicorp/go-uuid"
 )
 
 const (
@@ -101,7 +101,11 @@ type Storer interface {
 func FillTokenDefaults(token RefreshToken) (RefreshToken, error) {
 	res := token
 	if res.ID == "" {
-		res.ID = uuid.NewRandom().String()
+		id, err := uuid.GenerateUUID()
+		if err != nil {
+			return RefreshToken{}, err
+		}
+		res.ID = id
 	}
 	if res.CreatedAt.IsZero() {
 		res.CreatedAt = time.Now()

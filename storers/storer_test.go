@@ -11,7 +11,7 @@ import (
 
 	"impractical.co/auth/tokens"
 
-	"github.com/pborman/uuid"
+	"github.com/hashicorp/go-uuid"
 )
 
 const (
@@ -82,14 +82,26 @@ func TestCreateAndGetToken(t *testing.T) {
 		}
 		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
 			storer, ctx := storer, ctx
+			id, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			profileID, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			clientID, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
 			token := tokens.RefreshToken{
-				ID: uuid.NewRandom().String(),
+				ID: id,
 				// Postgres only stores times to the millisecond, so we have to round it going in
 				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 				CreatedFrom: fmt.Sprintf("test case for %T", storer),
 				Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
-				ProfileID:   uuid.NewRandom().String(),
-				ClientID:    uuid.NewRandom().String(),
+				ProfileID:   profileID,
+				ClientID:    clientID,
 				Revoked:     false,
 				Used:        true,
 			}
@@ -121,15 +133,27 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 		}
 		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
 			storer, ctx := storer, ctx
+			id, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			profileID, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			clientID, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
 
 			token := tokens.RefreshToken{
-				ID: uuid.NewRandom().String(),
+				ID: id,
 				// Postgres only stores times to the millisecond, so we have to round it going in
 				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 				CreatedFrom: fmt.Sprintf("test case for %T", storer),
 				Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
-				ProfileID:   uuid.NewRandom().String(),
-				ClientID:    uuid.NewRandom().String(),
+				ProfileID:   profileID,
+				ClientID:    clientID,
 				Revoked:     false,
 				Used:        true,
 			}
@@ -158,7 +182,11 @@ func TestGetTokenErrTokenNotFound(t *testing.T) {
 		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
 			storer, ctx := storer, ctx
 
-			token, err := storer.GetToken(ctx, uuid.NewRandom().String())
+			id, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Error generating UUID: %+v\n", err)
+			}
+			token, err := storer.GetToken(ctx, id)
 			if err != tokens.ErrTokenNotFound {
 				t.Errorf("Expected tokens.ErrTokenNotFound, %T returned %+v and %+v\n", storer, token, err)
 			}
@@ -176,14 +204,22 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 		}
 		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
 			storer, ctx := storer, ctx
+			profileID, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			clientID, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
 
 			token := tokens.RefreshToken{
 				// Postgres only stores times to the millisecond, so we have to round it going in
 				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 				CreatedFrom: fmt.Sprintf("test case for %T", storer),
 				Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
-				ProfileID:   uuid.NewRandom().String(),
-				ClientID:    uuid.NewRandom().String(),
+				ProfileID:   profileID,
+				ClientID:    clientID,
 				Revoked:     false,
 				Used:        true,
 			}
@@ -196,7 +232,11 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 					var change tokens.RefreshTokenChange
 					var revoked, used bool
 
-					token.ID = uuid.NewRandom().String()
+					id, err := uuid.GenerateUUID()
+					if err != nil {
+						t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+					}
+					token.ID = id
 					change.ID = token.ID
 
 					expectation := token
@@ -218,7 +258,7 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 						t.Errorf("Expected %s of change %d to be %v, got %v after applying tokens.RefreshTokenChange %+v\n", field, i, expectedVal, resultVal, change)
 					}
 
-					err := storer.CreateToken(ctx, token)
+					err = storer.CreateToken(ctx, token)
 					if err != nil {
 						t.Fatalf("Error creating token in %T: %+v\n", storer, err)
 					}
@@ -252,35 +292,65 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 		}
 		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
 			storer, ctx := storer, ctx
-			user1 := uuid.NewRandom().String()
-			user2 := uuid.NewRandom().String()
+			id1, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			id2, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			id3, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			user1, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			user2, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			clientID1, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			clientID2, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			clientID3, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
 
 			toks := []tokens.RefreshToken{
 				{
-					ID: uuid.NewRandom().String(),
+					ID: id1,
 					// Postgres only stores times to the millisecond, so we have to round it going in
 					CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 					CreatedFrom: fmt.Sprintf("test case for %T", storer),
 					Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
 					ProfileID:   user1,
-					ClientID:    uuid.NewRandom().String(),
+					ClientID:    clientID1,
 					Revoked:     false,
 					Used:        true,
 				}, {
-					ID:          uuid.NewRandom().String(),
+					ID:          id2,
 					CreatedAt:   time.Now().Add(1 * time.Hour).Round(time.Millisecond),
 					CreatedFrom: fmt.Sprintf("second test case for %T", storer),
 					Scopes:      []string{"this scope", "that scope"},
 					ProfileID:   user1,
-					ClientID:    uuid.NewRandom().String(),
+					ClientID:    clientID2,
 					Revoked:     false,
 					Used:        false,
 				}, {
-					ID:          uuid.NewRandom().String(),
+					ID:          id3,
 					CreatedAt:   time.Now().Add(1 * time.Minute).Round(time.Millisecond),
 					CreatedFrom: fmt.Sprintf("third test case for %T", storer),
 					ProfileID:   user2,
-					ClientID:    uuid.NewRandom().String(),
+					ClientID:    clientID3,
 					Revoked:     true,
 					Used:        false,
 				},
@@ -368,7 +438,11 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 
 			expectations = []tokens.RefreshToken{}
 
-			results, err = storer.GetTokensByProfileID(ctx, uuid.NewRandom().String(), time.Time{}, time.Time{})
+			bogusID, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			results, err = storer.GetTokensByProfileID(ctx, bogusID, time.Time{}, time.Time{})
 			if err != nil {
 				t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
 			}

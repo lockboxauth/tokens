@@ -1,4 +1,3 @@
 cover.out
 .cover-profiles
-tokensd/tokensd
-tokensd/sql
+vendor/

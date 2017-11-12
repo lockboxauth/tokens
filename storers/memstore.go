@@ -129,6 +129,36 @@ func (m *Memstore) UpdateTokens(ctx context.Context, change tokens.RefreshTokenC
 	return nil
 }
 
+// UseToken marks a tokens.RefreshToken as used, or returns a tokens.ErrTokenUsed
+// error if the tokens.RefreshToken was already marked used.
+func (m *Memstore) UseToken(ctx context.Context, id string) error {
+	txn := m.db.Txn(true)
+	defer txn.Abort()
+
+	tok, err := txn.First("token", "id", id)
+	if err != nil {
+		return err
+	}
+	if tok == nil {
+		return tokens.ErrTokenNotFound
+	}
+
+	if tok.(*tokens.RefreshToken).Used {
+		return tokens.ErrTokenUsed
+	}
+
+	used := true
+	updated := tokens.ApplyChange(*tok.(*tokens.RefreshToken), tokens.RefreshTokenChange{
+		Used: &used,
+	})
+	err = txn.Insert("token", &updated)
+	if err != nil {
+		return err
+	}
+	txn.Commit()
+	return nil
+}
+
 // GetTokensByProfileID retrieves up to NumTokenResults tokens.RefreshTokens from the Memstore. Only
 // tokens.RefreshTokens with a ProfileID property matching `profileID` will be returned. If `since` is
 // non-empty, only tokens.RefreshTokens with a CreatedAt property that is after `since` will be returned.

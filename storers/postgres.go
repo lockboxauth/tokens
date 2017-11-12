@@ -121,6 +121,57 @@ func (p Postgres) UpdateTokens(ctx context.Context, change tokens.RefreshTokenCh
 	return err
 }
 
+func useTokenSQL(ctx context.Context, id string) *pan.Query {
+	var t tokens.RefreshToken
+	query := pan.New("UPDATE " + pan.Table(t) + " SET ")
+	query.Comparison(t, "Used", "=", true)
+	query.Flush(" ").Where()
+	query.Comparison(t, "ID", "=", id)
+	query.Comparison(t, "Used", "=", false)
+	return query.Flush(" AND ")
+}
+
+func useTokenExistsSQL(ctx context.Context, id string) *pan.Query {
+	var t tokens.RefreshToken
+	query := pan.New("SELECT COUNT(*) FROM " + pan.Table(t))
+	query.Where()
+	query.Comparison(t, "ID", "=", id)
+	query.Comparison(t, "Used", "=", true)
+	return query.Flush(" AND ")
+}
+
+func (p Postgres) UseToken(ctx context.Context, id string) error {
+	query := useTokenSQL(ctx, id)
+	queryStr, err := query.PostgreSQLString()
+	if err != nil {
+		return err
+	}
+	rows, err := p.db.Exec(queryStr, query.Args()...)
+	if err != nil {
+		return err
+	}
+	results, err := rows.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if results >= 1 {
+		return nil
+	}
+	query = useTokenExistsSQL(ctx, id)
+	queryStr, err = query.PostgreSQLString()
+	if err != nil {
+		return err
+	}
+	err = p.db.QueryRow(queryStr, query.Args()...).Scan(&results)
+	if err != nil {
+		return err
+	}
+	if results >= 1 {
+		return tokens.ErrTokenUsed
+	}
+	return tokens.ErrTokenNotFound
+}
+
 func getTokensByProfileIDSQL(ctx context.Context, profileID string, since, before time.Time) *pan.Query {
 	var t tokens.RefreshToken
 	query := pan.New("SELECT " + pan.Columns(t).String() + " FROM " + pan.Table(t))

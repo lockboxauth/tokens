@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -166,6 +167,101 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 			err = storer.CreateToken(ctx, token)
 			if err != tokens.ErrTokenAlreadyExists {
 				t.Errorf("Expected tokens.ErrTokenAlreadyExists, %T returned %+v\n", storer, err)
+			}
+		})
+	}
+}
+
+func TestUseTokenErrTokenUsed(t *testing.T) {
+	t.Parallel()
+	for _, factory := range storerFactories {
+		ctx := context.Background()
+		storer, err := factory.NewStorer(ctx)
+		if err != nil {
+			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
+		}
+		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
+			storer, ctx := storer, ctx
+			id, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			profileID, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			clientID, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+
+			token := tokens.RefreshToken{
+				ID: id,
+				// Postgres only stores times to the millisecond, so we have to round it going in
+				CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
+				CreatedFrom: fmt.Sprintf("test case for %T", storer),
+				Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
+				ProfileID:   profileID,
+				ClientID:    clientID,
+				Revoked:     false,
+				Used:        false,
+			}
+
+			err = storer.CreateToken(ctx, token)
+			if err != nil {
+				t.Fatalf("Error creating token in %T: %+v\n", storer, err)
+			}
+			var usedErrors int
+			var successes int
+			var wg sync.WaitGroup
+			ch := make(chan error)
+			for i := 0; i < 20; i++ {
+				wg.Add(1)
+				go func(w *sync.WaitGroup, c chan error) {
+					c <- storer.UseToken(ctx, token.ID)
+					w.Done()
+				}(&wg, ch)
+			}
+			go func(w *sync.WaitGroup, c chan error) {
+				w.Wait()
+				close(c)
+			}(&wg, ch)
+			for err := range ch {
+				if err == tokens.ErrTokenUsed {
+					usedErrors++
+				} else if err == nil {
+					successes++
+				} else {
+					t.Errorf("Error using token: %s", err)
+				}
+			}
+			if successes != 1 {
+				t.Errorf("Expected %d successes, got %d", 1, successes)
+			}
+			if usedErrors != 19 {
+				t.Errorf("Expected %d tokens.ErrTokenUsed errors, got %d", 19, usedErrors)
+			}
+		})
+	}
+}
+
+func TestUseTokenErrTokenNotFound(t *testing.T) {
+	t.Parallel()
+	for _, factory := range storerFactories {
+		ctx := context.Background()
+		storer, err := factory.NewStorer(ctx)
+		if err != nil {
+			t.Fatalf("Error creating Storer from %T: %+v\n", factory, err)
+		}
+		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
+			storer, ctx := storer, ctx
+			id, err := uuid.GenerateUUID()
+			if err != nil {
+				t.Fatalf("Unexpected error generating UUID: %+v\n", err)
+			}
+			err = storer.UseToken(ctx, id)
+			if err != tokens.ErrTokenNotFound {
+				t.Errorf("Expected tokens.ErrTokenNotFound, %T returned %+v\n", storer, err)
 			}
 		})
 	}

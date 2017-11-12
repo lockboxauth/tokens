@@ -93,6 +93,7 @@ type Storer interface {
 	GetToken(ctx context.Context, id string) (RefreshToken, error)
 	CreateToken(ctx context.Context, token RefreshToken) error
 	UpdateTokens(ctx context.Context, change RefreshTokenChange) error
+	UseToken(ctx context.Context, id string) error
 	GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error)
 }
 

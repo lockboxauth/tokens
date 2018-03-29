@@ -46,7 +46,7 @@ func (p *PostgresFactory) NewStorer(ctx context.Context) (tokens.Storer, error) 
 
 	databaseSuffix, err := uuid.GenerateRandomBytes(6)
 	if err != nil {
-		log.Println("Error generating table suffix: %+v\n", err)
+		log.Printf("Error generating table suffix: %+v\n", err)
 		return nil, err
 	}
 	database := "tokens_test_" + hex.EncodeToString(databaseSuffix)

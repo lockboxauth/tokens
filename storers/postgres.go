@@ -140,6 +140,9 @@ func useTokenExistsSQL(ctx context.Context, id string) *pan.Query {
 	return query.Flush(" AND ")
 }
 
+// UseToken atomically marks the token specified by `id` as used, returning a
+// tokens.ErrTokenUsed if the token has already been marked used, or a
+// tokens.ErrTokenNotFound if the token doesn't exist in Postgres.
 func (p Postgres) UseToken(ctx context.Context, id string) error {
 	query := useTokenSQL(ctx, id)
 	queryStr, err := query.PostgreSQLString()

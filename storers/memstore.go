@@ -108,7 +108,7 @@ func (m *Memstore) UpdateTokens(ctx context.Context, change tokens.RefreshTokenC
 	} else if change.ClientID != "" {
 		iter, err = txn.Get("token", "clientID", change.ClientID)
 	} else {
-		return errors.New("Invalid change; needs an ID, ProfileID, or ClientID.")
+		return errors.New("invalid change; needs an ID, ProfileID, or ClientID")
 	}
 	if err != nil {
 		return err

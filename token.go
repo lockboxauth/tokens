@@ -172,6 +172,8 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 	return token, nil
 }
 
+// CreateJWT returns a signed JWT for `token`, using the private key set in
+// `d.JWTPrivateKey` as the private key to sign with.
 func (d Dependencies) CreateJWT(ctx context.Context, token RefreshToken) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, &jwt.StandardClaims{
 		Audience:  token.ClientID,

@@ -320,10 +320,10 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 				Used:        true,
 			}
 
-			for i := 1; i < changeVariations; i++ {
+			for i := 1; i <= changeVariations; i++ {
+				i := i
+				token := token
 				t.Run(fmt.Sprintf("Variation=%d", i), func(t *testing.T) {
-					i := i
-					token := token
 					t.Parallel()
 					var change tokens.RefreshTokenChange
 					var revoked, used bool
@@ -343,7 +343,7 @@ func TestCreateUpdateAndGetTokenByID(t *testing.T) {
 						change.Revoked = &revoked
 						expectation.Revoked = revoked
 					}
-					if i&changeUsed == 0 {
+					if i&changeUsed != 0 {
 						used = i%2 != 0
 						change.Used = &used
 						expectation.Used = used

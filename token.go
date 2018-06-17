@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"impractical.co/pqarrays"
+	yall "yall.in"
 
-	"github.com/apex/log"
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/hashicorp/go-uuid"
 )
@@ -140,7 +140,6 @@ type Dependencies struct {
 	Storer        Storer // Storer is the Storer to use when retrieving, setting, or removing RefreshTokens.
 	JWTPrivateKey *rsa.PrivateKey
 	JWTPublicKey  *rsa.PublicKey
-	Log           *log.Logger
 }
 
 // Validate checks that the token with the given ID has the given value, and returns an
@@ -150,23 +149,27 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 		return d.JWTPublicKey, nil
 	})
 	if err != nil {
-		d.Log.WithError(err).Debug("Error validating token.")
+		yall.FromContext(ctx).WithError(err).Debug("Error validating token.")
 		return RefreshToken{}, ErrInvalidToken
 	}
 	claims, ok := tok.Claims.(*jwt.StandardClaims)
 	if !ok {
 		return RefreshToken{}, ErrInvalidToken
 	}
+	log := yall.FromContext(ctx).WithField("id", claims.Id)
 	token, err := d.Storer.GetToken(ctx, claims.Id)
 	if err == ErrTokenNotFound {
 		return RefreshToken{}, ErrInvalidToken
 	} else if err != nil {
+		log.WithError(err).Error("error retrieving token")
 		return RefreshToken{}, err
 	}
 	if token.Revoked {
+		log.Debug("revoked token presented")
 		return RefreshToken{}, ErrTokenRevoked
 	}
 	if token.Used {
+		log.Debug("used token presented")
 		return RefreshToken{}, ErrTokenUsed
 	}
 	return token, nil

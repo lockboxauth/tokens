@@ -19,8 +19,8 @@ type Postgres struct {
 }
 
 // NewPostgres returns an instance of Postgres that is ready to be used as a Storer.
-func NewPostgres(ctx context.Context, db *sql.DB) (Postgres, error) {
-	return Postgres{db: db}, nil
+func NewPostgres(ctx context.Context, db *sql.DB) Postgres {
+	return Postgres{db: db}
 }
 
 func getTokenSQL(ctx context.Context, token string) *pan.Query {

@@ -1,18 +1,21 @@
 package tokens
 
+// TODO: refactor storers to match pattern
+
 //go:generate go-bindata -pkg migrations -o migrations/generated.go sql/
 
 import (
 	"context"
 	"crypto/rsa"
 	"errors"
+	"fmt"
 	"time"
 
 	"impractical.co/pqarrays"
 	yall "yall.in"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/hashicorp/go-uuid"
+	uuid "github.com/hashicorp/go-uuid"
 )
 
 const (
@@ -140,12 +143,16 @@ type Dependencies struct {
 	Storer        Storer // Storer is the Storer to use when retrieving, setting, or removing RefreshTokens.
 	JWTPrivateKey *rsa.PrivateKey
 	JWTPublicKey  *rsa.PublicKey
+	ServiceID     string
 }
 
 // Validate checks that the token with the given ID has the given value, and returns an
 // ErrInvalidToken if not.
 func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken, error) {
 	tok, err := jwt.Parse(jwtVal, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
 		return d.JWTPublicKey, nil
 	})
 	if err != nil {
@@ -178,12 +185,13 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 // CreateJWT returns a signed JWT for `token`, using the private key set in
 // `d.JWTPrivateKey` as the private key to sign with.
 func (d Dependencies) CreateJWT(ctx context.Context, token RefreshToken) (string, error) {
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, &jwt.StandardClaims{
+	// TODO: include key id in JWT headers
+	return jwt.NewWithClaims(jwt.SigningMethodRS256, &jwt.StandardClaims{
 		Audience:  token.ClientID,
 		ExpiresAt: token.CreatedAt.UTC().Add(refreshLength).Unix(),
 		Id:        token.ID,
 		IssuedAt:  token.CreatedAt.UTC().Unix(),
-		Issuer:    token.CreatedFrom,
+		Issuer:    d.ServiceID,
 		NotBefore: token.CreatedAt.UTC().Add(-1 * time.Hour).Unix(),
 		Subject:   token.ProfileID,
 	}).SignedString(d.JWTPrivateKey)

@@ -10,11 +10,11 @@ import (
 	"os"
 	"sync"
 
-	"impractical.co/auth/tokens"
-	"impractical.co/auth/tokens/migrations"
+	uuid "github.com/hashicorp/go-uuid"
+	migrate "github.com/rubenv/sql-migrate"
 
-	"github.com/hashicorp/go-uuid"
-	"github.com/rubenv/sql-migrate"
+	"lockbox.dev/tokens"
+	"lockbox.dev/tokens/migrations"
 )
 
 func init() {

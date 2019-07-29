@@ -8,7 +8,7 @@ import (
 
 	memdb "github.com/hashicorp/go-memdb"
 
-	"impractical.co/auth/tokens"
+	"lockbox.dev/tokens"
 )
 
 var (

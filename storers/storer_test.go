@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"impractical.co/auth/tokens"
+	uuid "github.com/hashicorp/go-uuid"
 
-	"github.com/hashicorp/go-uuid"
+	"lockbox.dev/tokens"
 )
 
 const (

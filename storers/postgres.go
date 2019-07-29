@@ -5,11 +5,10 @@ import (
 	"database/sql"
 	"time"
 
-	"impractical.co/auth/tokens"
-
 	"darlinggo.co/pan"
-
 	"github.com/lib/pq"
+
+	"lockbox.dev/tokens"
 )
 
 // Postgres is an implementation of the Storer interface that is production quality

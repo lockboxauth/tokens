@@ -3,7 +3,7 @@ package storers
 import (
 	"context"
 
-	"impractical.co/auth/tokens"
+	"lockbox.dev/tokens"
 )
 
 func init() {

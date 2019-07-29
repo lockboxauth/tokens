@@ -7,15 +7,18 @@ package tokens
 import (
 	"context"
 	"crypto/rsa"
-	"errors"
 	"fmt"
+	"sync"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 
 	"impractical.co/pqarrays"
 	yall "yall.in"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	uuid "github.com/hashicorp/go-uuid"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -140,10 +143,30 @@ func (r RefreshTokensByCreatedAt) Swap(i, j int) {
 // Dependencies manages the dependency injection for the tokens package. All its properties are required for
 // a Dependencies struct to be valid.
 type Dependencies struct {
-	Storer        Storer // Storer is the Storer to use when retrieving, setting, or removing RefreshTokens.
-	JWTPrivateKey *rsa.PrivateKey
-	JWTPublicKey  *rsa.PublicKey
-	ServiceID     string
+	Storer              Storer // Storer is the Storer to use when retrieving, setting, or removing RefreshTokens.
+	JWTPrivateKey       *rsa.PrivateKey
+	JWTPublicKey        *rsa.PublicKey
+	pubKeyFingerprint   *string
+	pubKeyFingerprintMu *sync.RWMutex
+	ServiceID           string
+}
+
+func (d Dependencies) GetPublicKeyFingerprint(pk *rsa.PublicKey) (string, error) {
+	d.pubKeyFingerprintMu.RLock()
+	if d.pubKeyFingerprint != nil {
+		d.pubKeyFingerprintMu.RUnlock()
+		return *d.pubKeyFingerprint, nil
+	}
+	d.pubKeyFingerprintMu.RUnlock()
+	d.pubKeyFingerprintMu.Lock()
+	defer d.pubKeyFingerprintMu.Unlock()
+	p, err := ssh.NewPublicKey(pk)
+	if err != nil {
+		return "", errors.Wrap(err, "Error creating SSH public key")
+	}
+	fingerprint := ssh.FingerprintSHA256(p)
+	d.pubKeyFingerprint = &fingerprint
+	return *d.pubKeyFingerprint, nil
 }
 
 // Validate checks that the token with the given ID has the given value, and returns an
@@ -152,6 +175,13 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 	tok, err := jwt.Parse(jwtVal, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
+		fp, err := d.GetPublicKeyFingerprint(d.JWTPublicKey)
+		if err != nil {
+			return nil, err
+		}
+		if fp != token.Header["kid"] {
+			return nil, errors.New("unknown signing key")
 		}
 		return d.JWTPublicKey, nil
 	})
@@ -185,8 +215,7 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 // CreateJWT returns a signed JWT for `token`, using the private key set in
 // `d.JWTPrivateKey` as the private key to sign with.
 func (d Dependencies) CreateJWT(ctx context.Context, token RefreshToken) (string, error) {
-	// TODO: include key id in JWT headers
-	return jwt.NewWithClaims(jwt.SigningMethodRS256, &jwt.StandardClaims{
+	t := jwt.NewWithClaims(jwt.SigningMethodRS256, &jwt.StandardClaims{
 		Audience:  token.ClientID,
 		ExpiresAt: token.CreatedAt.UTC().Add(refreshLength).Unix(),
 		Id:        token.ID,
@@ -194,5 +223,11 @@ func (d Dependencies) CreateJWT(ctx context.Context, token RefreshToken) (string
 		Issuer:    d.ServiceID,
 		NotBefore: token.CreatedAt.UTC().Add(-1 * time.Hour).Unix(),
 		Subject:   token.ProfileID,
-	}).SignedString(d.JWTPrivateKey)
+	})
+	fp, err := d.GetPublicKeyFingerprint(d.JWTPublicKey)
+	if err != nil {
+		return "", err
+	}
+	t.Header["kid"] = fp
+	return t.SignedString(d.JWTPrivateKey)
 }

@@ -10,8 +10,10 @@ require (
 	github.com/hashicorp/go-uuid v1.0.0
 	github.com/lib/pq v1.0.0
 	github.com/mattn/go-sqlite3 v1.9.0 // indirect
+	github.com/pkg/errors v0.8.0
 	github.com/rubenv/sql-migrate v0.0.0-20180704111356-3f452fc0ebeb
 	github.com/ziutek/mymysql v1.5.4 // indirect
+	golang.org/x/crypto v0.0.0-20180904163835-0709b304e793
 	google.golang.org/appengine v1.1.0 // indirect
 	gopkg.in/gorp.v1 v1.7.1 // indirect
 	impractical.co/pqarrays v0.0.0-20170820231347-970404683d98

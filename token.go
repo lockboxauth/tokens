@@ -1,9 +1,5 @@
 package tokens
 
-// TODO: refactor storers to match pattern
-
-//go:generate go-bindata -pkg migrations -o migrations/generated.go sql/
-
 import (
 	"context"
 	"crypto/rsa"
@@ -13,7 +9,6 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"impractical.co/pqarrays"
 	yall "yall.in"
 
 	jwt "github.com/dgrijalva/jwt-go"
@@ -47,17 +42,11 @@ type RefreshToken struct {
 	ID          string
 	CreatedAt   time.Time
 	CreatedFrom string
-	Scopes      pqarrays.StringArray
+	Scopes      []string
 	ProfileID   string
 	ClientID    string
 	Revoked     bool
 	Used        bool
-}
-
-// GetSQLTableName returns the name of the PostgreSQL table RefreshTokens will be stored
-// in. It is required for use with pan.
-func (t RefreshToken) GetSQLTableName() string {
-	return "tokens"
 }
 
 // RefreshTokenChange represents a change to one or more RefreshTokens. If ID is set, only the RefreshToken
@@ -91,16 +80,6 @@ func ApplyChange(t RefreshToken, change RefreshTokenChange) RefreshToken {
 		result.Used = *change.Used
 	}
 	return result
-}
-
-// Storer represents an interface to a persistence method for RefreshTokens. It is used to store, update, and
-// retrieve RefreshTokens.
-type Storer interface {
-	GetToken(ctx context.Context, id string) (RefreshToken, error)
-	CreateToken(ctx context.Context, token RefreshToken) error
-	UpdateTokens(ctx context.Context, change RefreshTokenChange) error
-	UseToken(ctx context.Context, id string) error
-	GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]RefreshToken, error)
 }
 
 // FillTokenDefaults returns a copy of `token` with all empty properties that have default values, like ID

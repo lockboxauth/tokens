@@ -1,4 +1,4 @@
-package storers
+package memory
 
 import (
 	"context"
@@ -38,25 +38,25 @@ var (
 	}
 )
 
-// Memstore is an in-memory implementation of the Storer interface, for use in testing.
-type Memstore struct {
+// Storer is an in-memory implementation of the Storer interface, for use in testing.
+type Storer struct {
 	db *memdb.MemDB
 }
 
-// NewMemstore returns an instance of Memstore that is ready to be used as a Storer.
-func NewMemstore() (*Memstore, error) {
+// NewStorer returns an instance of Storer that is ready to be used as a Storer.
+func NewStorer() (*Storer, error) {
 	db, err := memdb.NewMemDB(schema)
 	if err != nil {
 		return nil, err
 	}
-	return &Memstore{
+	return &Storer{
 		db: db,
 	}, nil
 }
 
-// GetToken retrieves the tokens.RefreshToken with an ID matching `token` from the Memstore. If
+// GetToken retrieves the tokens.RefreshToken with an ID matching `token` from the Storer. If
 // no tokens.RefreshToken has that ID, an ErrTokenNotFound error is returned.
-func (m *Memstore) GetToken(ctx context.Context, token string) (tokens.RefreshToken, error) {
+func (m *Storer) GetToken(ctx context.Context, token string) (tokens.RefreshToken, error) {
 	txn := m.db.Txn(false)
 	tok, err := txn.First("token", "id", token)
 	if err != nil {
@@ -68,10 +68,10 @@ func (m *Memstore) GetToken(ctx context.Context, token string) (tokens.RefreshTo
 	return *tok.(*tokens.RefreshToken), nil
 }
 
-// CreateToken inserts the passed tokens.RefreshToken into the Memstore. If a tokens.RefreshToken with
-// the same ID already exists in the Memstore, an ErrTokenAlreadyExists error will be
+// CreateToken inserts the passed tokens.RefreshToken into the Storer. If a tokens.RefreshToken with
+// the same ID already exists in the Storer, an ErrTokenAlreadyExists error will be
 // returned, and the tokens.RefreshToken will not be inserted.
-func (m *Memstore) CreateToken(ctx context.Context, token tokens.RefreshToken) error {
+func (m *Storer) CreateToken(ctx context.Context, token tokens.RefreshToken) error {
 	txn := m.db.Txn(true)
 	defer txn.Abort()
 	exists, err := txn.First("token", "id", token.ID)
@@ -89,9 +89,9 @@ func (m *Memstore) CreateToken(ctx context.Context, token tokens.RefreshToken) e
 	return nil
 }
 
-// UpdateTokens applies `change` to all the tokens.RefreshTokens in the Memstore that match the ID,
+// UpdateTokens applies `change` to all the tokens.RefreshTokens in the Storer that match the ID,
 // ProfileID, or ClientID constraints of `change`.
-func (m *Memstore) UpdateTokens(ctx context.Context, change tokens.RefreshTokenChange) error {
+func (m *Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenChange) error {
 	if change.IsEmpty() {
 		return nil
 	}
@@ -131,7 +131,7 @@ func (m *Memstore) UpdateTokens(ctx context.Context, change tokens.RefreshTokenC
 
 // UseToken marks a tokens.RefreshToken as used, or returns a tokens.ErrTokenUsed
 // error if the tokens.RefreshToken was already marked used.
-func (m *Memstore) UseToken(ctx context.Context, id string) error {
+func (m *Storer) UseToken(ctx context.Context, id string) error {
 	txn := m.db.Txn(true)
 	defer txn.Abort()
 
@@ -159,13 +159,13 @@ func (m *Memstore) UseToken(ctx context.Context, id string) error {
 	return nil
 }
 
-// GetTokensByProfileID retrieves up to NumTokenResults tokens.RefreshTokens from the Memstore. Only
+// GetTokensByProfileID retrieves up to NumTokenResults tokens.RefreshTokens from the Storer. Only
 // tokens.RefreshTokens with a ProfileID property matching `profileID` will be returned. If `since` is
 // non-empty, only tokens.RefreshTokens with a CreatedAt property that is after `since` will be returned.
 // If `before` is non-empty, only tokens.RefreshTokens with a CreatedAt property that is before `before`
 // will be returned. tokens.RefreshTokens will be sorted by their CreatedAt property, with the most recent
 // coming first.
-func (m *Memstore) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]tokens.RefreshToken, error) {
+func (m *Storer) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]tokens.RefreshToken, error) {
 	txn := m.db.Txn(false)
 	defer txn.Abort()
 

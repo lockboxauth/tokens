@@ -1,4 +1,4 @@
-package storers
+package postgres
 
 import (
 	"context"
@@ -14,27 +14,23 @@ import (
 	migrate "github.com/rubenv/sql-migrate"
 
 	"lockbox.dev/tokens"
-	"lockbox.dev/tokens/migrations"
+	"lockbox.dev/tokens/storers/postgres/migrations"
 )
 
-func init() {
-	if os.Getenv("PG_TEST_DB") == "" {
-		return
-	}
-	storerConn, err := sql.Open("postgres", os.Getenv("PG_TEST_DB"))
-	if err != nil {
-		panic(err)
-	}
-	storerFactories = append(storerFactories, &PostgresFactory{db: storerConn})
-}
-
-type PostgresFactory struct {
+type Factory struct {
 	db        *sql.DB
 	databases map[string]*sql.DB
 	lock      sync.Mutex
 }
 
-func (p *PostgresFactory) NewStorer(ctx context.Context) (tokens.Storer, error) {
+func NewFactory(db *sql.DB) *Factory {
+	return &Factory{
+		db:        db,
+		databases: map[string]*sql.DB{},
+	}
+}
+
+func (f *Factory) NewStorer(ctx context.Context) (tokens.Storer, error) {
 	u, err := url.Parse(os.Getenv("PG_TEST_DB"))
 	if err != nil {
 		log.Printf("Error parsing PG_TEST_DB as a URL: %+v\n", err)
@@ -51,7 +47,7 @@ func (p *PostgresFactory) NewStorer(ctx context.Context) (tokens.Storer, error) 
 	}
 	database := "tokens_test_" + hex.EncodeToString(databaseSuffix)
 
-	_, err = p.db.Exec("CREATE DATABASE " + database + ";")
+	_, err = f.db.Exec("CREATE DATABASE " + database + ";")
 	if err != nil {
 		log.Printf("Error creating database %s: %+v\n", database, err)
 		return nil, err
@@ -64,12 +60,12 @@ func (p *PostgresFactory) NewStorer(ctx context.Context) (tokens.Storer, error) 
 		return nil, err
 	}
 
-	p.lock.Lock()
-	if p.databases == nil {
-		p.databases = map[string]*sql.DB{}
+	f.lock.Lock()
+	if f.databases == nil {
+		f.databases = map[string]*sql.DB{}
 	}
-	p.databases[database] = newConn
-	p.lock.Unlock()
+	f.databases[database] = newConn
+	f.lock.Unlock()
 
 	migrations := &migrate.AssetMigrationSource{
 		Asset:    migrations.Asset,
@@ -81,20 +77,20 @@ func (p *PostgresFactory) NewStorer(ctx context.Context) (tokens.Storer, error) 
 		return nil, err
 	}
 
-	storer := NewPostgres(ctx, newConn)
+	storer := NewStorer(ctx, newConn)
 	return storer, nil
 }
 
-func (p *PostgresFactory) TeardownStorer() error {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	for table, conn := range p.databases {
+func (f *Factory) TeardownStorer() error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	for table, conn := range f.databases {
 		conn.Close()
-		_, err := p.db.Exec("DROP DATABASE " + table + ";")
+		_, err := f.db.Exec("DROP DATABASE " + table + ";")
 		if err != nil {
 			return err
 		}
 	}
-	p.db.Close()
+	f.db.Close()
 	return nil
 }

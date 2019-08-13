@@ -99,26 +99,6 @@ func FillTokenDefaults(token RefreshToken) (RefreshToken, error) {
 	return res, nil
 }
 
-// RefreshTokensByCreatedAt represents a slice of RefreshTokens that can be sorted by their CreatedAt property
-// using the sort package.
-type RefreshTokensByCreatedAt []RefreshToken
-
-// Less returns true if the RefreshToken at position `i` has a CreatedAt property that is more recent than the
-// RefreshToken at position `j`.
-func (r RefreshTokensByCreatedAt) Less(i, j int) bool {
-	return r[i].CreatedAt.After(r[j].CreatedAt)
-}
-
-// Len returns the number of RefreshTokens in the slice.
-func (r RefreshTokensByCreatedAt) Len() int {
-	return len(r)
-}
-
-// Swap puts the RefreshToken in position `i` in position `j`, and the RefreshToken in position `j` in position `i`.
-func (r RefreshTokensByCreatedAt) Swap(i, j int) {
-	r[i], r[j] = r[j], r[i]
-}
-
 // Dependencies manages the dependency injection for the tokens package. All its properties are required for
 // a Dependencies struct to be valid.
 type Dependencies struct {

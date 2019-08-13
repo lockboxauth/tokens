@@ -189,9 +189,9 @@ func (m *Storer) GetTokensByProfileID(ctx context.Context, profileID string, sin
 		}
 		toks = append(toks, token)
 	}
+	sort.Slice(toks, func(i, j int) bool { return toks[i].CreatedAt.After(toks[j].CreatedAt) })
 	if len(toks) > tokens.NumTokenResults {
 		toks = toks[:tokens.NumTokenResults]
 	}
-	sort.Sort(tokens.RefreshTokensByCreatedAt(toks))
 	return toks, nil
 }

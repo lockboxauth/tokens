@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -316,6 +317,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
 		user1 := uuidOrFail(t)
 		user2 := uuidOrFail(t)
+		user3 := uuidOrFail(t)
 
 		toks := []tokens.RefreshToken{
 			{
@@ -348,10 +350,32 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 			},
 		}
 
+		var dynamicToks []tokens.RefreshToken
+		for i := 0; i < 100; i++ {
+			dynamicToks = append(dynamicToks, tokens.RefreshToken{
+				ID:          uuidOrFail(t),
+				CreatedAt:   time.Now().Add(time.Duration(i) * time.Second).Round(time.Millisecond),
+				CreatedFrom: fmt.Sprintf("paginated test case %d for %T", i, storer),
+				ProfileID:   user3,
+				ClientID:    uuidOrFail(t),
+				Revoked:     i%2 == 0,
+				Used:        i%2 != 0,
+			})
+		}
+		sort.Slice(dynamicToks, func(i, j int) bool {
+			return dynamicToks[i].CreatedAt.After(dynamicToks[j].CreatedAt)
+		})
+
 		for _, token := range toks {
 			err := storer.CreateToken(ctx, token)
 			if err != nil {
 				t.Errorf("Error creating token %+v in %T: %+v\n", token, storer, err)
+			}
+		}
+		for _, token := range dynamicToks {
+			err := storer.CreateToken(ctx, token)
+			if err != nil {
+				t.Errorf("Error creating dynamic token %+v in %T: %+v\n", token, storer, err)
 			}
 		}
 
@@ -366,6 +390,10 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 			{user: uuidOrFail(t), expectations: []tokens.RefreshToken{}},
 			{user: user1, before: time.Now(), expectations: []tokens.RefreshToken{toks[0]}},
 			{user: user1, since: time.Now(), expectations: []tokens.RefreshToken{toks[1]}},
+			{user: user3, expectations: dynamicToks[:tokens.NumTokenResults]},
+			{user: user3, before: dynamicToks[tokens.NumTokenResults-1].CreatedAt, expectations: dynamicToks[tokens.NumTokenResults : tokens.NumTokenResults*2]},
+			{user: user3, before: dynamicToks[2*tokens.NumTokenResults-1].CreatedAt, expectations: dynamicToks[tokens.NumTokenResults*2 : tokens.NumTokenResults*3]},
+			{user: user3, before: dynamicToks[3*tokens.NumTokenResults-1].CreatedAt, expectations: dynamicToks[tokens.NumTokenResults*3 : tokens.NumTokenResults*4]},
 		}
 
 		for pos, tc := range testcases {
@@ -398,4 +426,3 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 
 // TODO: test updating tokens by profile ID
 // TODO: test updating tokens by client ID
-// TODO: test paginating tokens when listing by Profile ID

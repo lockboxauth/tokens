@@ -424,5 +424,159 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 	})
 }
 
-// TODO: test updating tokens by profile ID
-// TODO: test updating tokens by client ID
+func TestCreateAndUpdateTokensByProfileID(t *testing.T) {
+	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
+		for i := 1; i <= changeVariations; i++ {
+			i := i
+			t.Run(fmt.Sprintf("Variation=%d", i), func(t *testing.T) {
+				t.Parallel()
+				var change tokens.RefreshTokenChange
+				var revoked, used bool
+				user1 := uuidOrFail(t)
+				user2 := uuidOrFail(t)
+				user3 := uuidOrFail(t)
+
+				toks := make([]tokens.RefreshToken, 0, 100)
+				for i := 0; i < 100; i++ {
+					var u string
+					switch i % 3 {
+					case 0:
+						u = user1
+					case 1:
+						u = user2
+					case 2:
+						u = user3
+					}
+					toks = append(toks, tokens.RefreshToken{
+						ID:          uuidOrFail(t),
+						CreatedAt:   time.Now().Add(time.Duration(i) * time.Second).Round(time.Millisecond),
+						CreatedFrom: fmt.Sprintf("test case %d for %T", i, storer),
+						ProfileID:   u,
+						ClientID:    uuidOrFail(t),
+						Revoked:     i%2 == 0,
+						Used:        i%2 != 0,
+					})
+				}
+				sort.Slice(toks, func(i, j int) bool {
+					return toks[i].CreatedAt.After(toks[j].CreatedAt)
+				})
+
+				for _, token := range toks {
+					err := storer.CreateToken(ctx, token)
+					if err != nil {
+						t.Errorf("Error creating token %+v in %T: %+v\n", token, storer, err)
+					}
+				}
+
+				if i&changeRevoked != 0 {
+					revoked = i%2 == 0
+					change.Revoked = &revoked
+				}
+				if i&changeUsed != 0 {
+					used = i%2 != 0
+					change.Used = &used
+				}
+				change.ProfileID = user3
+
+				err := storer.UpdateTokens(ctx, change)
+				if err != nil {
+					t.Fatalf("Error updating token in %T: %+v\n", storer, err)
+				}
+				for _, tok := range toks {
+					expectation := tok
+					if tok.ProfileID == change.ProfileID {
+						expectation = tokens.ApplyChange(expectation, change)
+					}
+					result, err := storer.GetToken(ctx, tok.ID)
+					if err != nil {
+						t.Fatalf("Error retrieving token from %T: %+v\n", storer, err)
+					}
+					ok, field, expectedVal, resultVal := compareRefreshTokens(expectation, result)
+					if !ok {
+						t.Errorf("Expected %s of change %d (ID %s) to be %v, got %v from %T\n", field, i, tok.ID, expectedVal, resultVal, storer)
+					}
+				}
+			})
+		}
+	})
+}
+
+func TestCreateAndUpdateTokensByClientID(t *testing.T) {
+	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
+		for i := 1; i <= changeVariations; i++ {
+			i := i
+			t.Run(fmt.Sprintf("Variation=%d", i), func(t *testing.T) {
+				t.Parallel()
+				var change tokens.RefreshTokenChange
+				var revoked, used bool
+				client1 := uuidOrFail(t)
+				client2 := uuidOrFail(t)
+				client3 := uuidOrFail(t)
+
+				toks := make([]tokens.RefreshToken, 0, 100)
+				for i := 0; i < 100; i++ {
+					var client string
+					switch i % 3 {
+					case 0:
+						client = client1
+					case 1:
+						client = client2
+					case 2:
+						client = client3
+					}
+					toks = append(toks, tokens.RefreshToken{
+						ID:          uuidOrFail(t),
+						CreatedAt:   time.Now().Add(time.Duration(i) * time.Second).Round(time.Millisecond),
+						CreatedFrom: fmt.Sprintf("test case %d for %T", i, storer),
+						ClientID:    client,
+						ProfileID:   uuidOrFail(t),
+						Revoked:     i%2 == 0,
+						Used:        i%2 != 0,
+					})
+				}
+				sort.Slice(toks, func(i, j int) bool {
+					return toks[i].CreatedAt.After(toks[j].CreatedAt)
+				})
+
+				for _, token := range toks {
+					err := storer.CreateToken(ctx, token)
+					if err != nil {
+						t.Errorf("Error creating token %+v in %T: %+v\n", token, storer, err)
+					}
+				}
+
+				if i&changeRevoked != 0 {
+					revoked = i%2 == 0
+					change.Revoked = &revoked
+				}
+				if i&changeUsed != 0 {
+					used = i%2 != 0
+					change.Used = &used
+				}
+				change.ClientID = client2
+
+				err := storer.UpdateTokens(ctx, change)
+				if err != nil {
+					t.Fatalf("Error updating token in %T: %+v\n", storer, err)
+				}
+				for _, tok := range toks {
+					expectation := tok
+					if tok.ClientID == change.ClientID {
+						expectation = tokens.ApplyChange(expectation, change)
+					}
+					result, err := storer.GetToken(ctx, tok.ID)
+					if err != nil {
+						t.Fatalf("Error retrieving token from %T: %+v\n", storer, err)
+					}
+					ok, field, expectedVal, resultVal := compareRefreshTokens(expectation, result)
+					if !ok {
+						t.Errorf("Expected %s of change %d (ID %s) to be %v, got %v from %T\n", field, i, tok.ID, expectedVal, resultVal, storer)
+					}
+				}
+			})
+		}
+	})
+}
+
+// TODO: test updating by combinations of ID, ProfileID, and ClientID
+// TODO: test updating with none of ID, ProfileID, or ClientID set

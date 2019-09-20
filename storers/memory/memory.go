@@ -2,7 +2,6 @@ package memory
 
 import (
 	"context"
-	"errors"
 	"sort"
 	"time"
 
@@ -96,19 +95,23 @@ func (m *Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenCha
 		return nil
 	}
 
+	if !change.HasFilter() {
+		return tokens.ErrNoTokenChangeFilter
+	}
+
 	txn := m.db.Txn(true)
 	defer txn.Abort()
 
 	var iter memdb.ResultIterator
 	var err error
-	if change.ID != "" {
+	if change.ID != "" && change.ProfileID == "" && change.ClientID == "" {
 		iter, err = txn.Get("token", "id", change.ID)
-	} else if change.ProfileID != "" {
+	} else if change.ProfileID != "" && change.ClientID == "" && change.ID == "" {
 		iter, err = txn.Get("token", "profileID", change.ProfileID)
-	} else if change.ClientID != "" {
+	} else if change.ClientID != "" && change.ProfileID == "" && change.ID == "" {
 		iter, err = txn.Get("token", "clientID", change.ClientID)
 	} else {
-		return errors.New("invalid change; needs an ID, ProfileID, or ClientID")
+		iter, err = txn.Get("token", "id")
 	}
 	if err != nil {
 		return err
@@ -119,7 +122,17 @@ func (m *Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenCha
 		if token == nil {
 			break
 		}
-		updated := tokens.ApplyChange(*token.(*tokens.RefreshToken), change)
+		tok := *token.(*tokens.RefreshToken)
+		if change.ID != "" && tok.ID != change.ID {
+			continue
+		}
+		if change.ProfileID != "" && tok.ProfileID != change.ProfileID {
+			continue
+		}
+		if change.ClientID != "" && tok.ClientID != change.ClientID {
+			continue
+		}
+		updated := tokens.ApplyChange(tok, change)
 		err = txn.Insert("token", &updated)
 		if err != nil {
 			return err

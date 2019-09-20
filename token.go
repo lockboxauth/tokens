@@ -35,6 +35,9 @@ var (
 	ErrTokenRevoked = errors.New("token revoked")
 	// ErrTokenUsed is returned when the Token identified by Validate has already been used.
 	ErrTokenUsed = errors.New("token used")
+	// ErrNoTokenChangeFilter is returned when a TokenChange is passed to UpdateTokens
+	// that has none of the filtering fields set.
+	ErrNoTokenChangeFilter = errors.New("invalid token change: must have one or more filter fields set")
 )
 
 // RefreshToken represents a refresh token that can be used to obtain a new access token.
@@ -67,6 +70,21 @@ type RefreshTokenChange struct {
 // IsEmpty returns true if the RefreshTokenChange would not update any property on the matching RefreshTokens.
 func (r RefreshTokenChange) IsEmpty() bool {
 	return r.Revoked == nil && r.Used == nil
+}
+
+// HasFilter returns true if one of the fields of `r` that is used to filter which tokens to apply the change
+// to is set.
+func (r RefreshTokenChange) HasFilter() bool {
+	if r.ID != "" {
+		return true
+	}
+	if r.ProfileID != "" {
+		return true
+	}
+	if r.ClientID != "" {
+		return true
+	}
+	return false
 }
 
 // ApplyChange updates the properties on `t` as specified by `change`. It does not check that `t` would be

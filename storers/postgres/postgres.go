@@ -117,6 +117,9 @@ func (s Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenChan
 	if change.IsEmpty() {
 		return nil
 	}
+	if !change.HasFilter() {
+		return tokens.ErrNoTokenChangeFilter
+	}
 	query := updateTokensSQL(ctx, change)
 	queryStr, err := query.PostgreSQLString()
 	if err != nil {

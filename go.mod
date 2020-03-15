@@ -22,3 +22,5 @@ require (
 	impractical.co/pqarrays v0.1.0
 	yall.in v0.0.1
 )
+
+go 1.13

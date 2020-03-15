@@ -128,6 +128,17 @@ type Dependencies struct {
 	ServiceID           string
 }
 
+func NewDependencies(storer Storer, priv *rsa.PrivateKey, pub *rsa.PublicKey, service string) Dependencies {
+	var mu sync.RWMutex
+	return Dependencies{
+		Storer:              storer,
+		JWTPrivateKey:       priv,
+		JWTPublicKey:        pub,
+		pubKeyFingerprintMu: &mu,
+		ServiceID:           service,
+	}
+}
+
 func (d Dependencies) GetPublicKeyFingerprint(pk *rsa.PublicKey) (string, error) {
 	d.pubKeyFingerprintMu.RLock()
 	if d.pubKeyFingerprint != nil {

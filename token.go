@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
-	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -120,41 +119,19 @@ func FillTokenDefaults(token RefreshToken) (RefreshToken, error) {
 // Dependencies manages the dependency injection for the tokens package. All its properties are required for
 // a Dependencies struct to be valid.
 type Dependencies struct {
-	Storer              Storer // Storer is the Storer to use when retrieving, setting, or removing RefreshTokens.
-	JWTPrivateKey       *rsa.PrivateKey
-	JWTPublicKey        *rsa.PublicKey
-	pubKeyFingerprint   *string
-	pubKeyFingerprintMu *sync.RWMutex
-	ServiceID           string
+	Storer        Storer // Storer is the Storer to use when retrieving, setting, or removing RefreshTokens.
+	JWTPrivateKey *rsa.PrivateKey
+	JWTPublicKey  *rsa.PublicKey
+	ServiceID     string
 }
 
-func NewDependencies(storer Storer, priv *rsa.PrivateKey, pub *rsa.PublicKey, service string) Dependencies {
-	var mu sync.RWMutex
-	return Dependencies{
-		Storer:              storer,
-		JWTPrivateKey:       priv,
-		JWTPublicKey:        pub,
-		pubKeyFingerprintMu: &mu,
-		ServiceID:           service,
-	}
-}
-
-func (d Dependencies) GetPublicKeyFingerprint(pk *rsa.PublicKey) (string, error) {
-	d.pubKeyFingerprintMu.RLock()
-	if d.pubKeyFingerprint != nil {
-		d.pubKeyFingerprintMu.RUnlock()
-		return *d.pubKeyFingerprint, nil
-	}
-	d.pubKeyFingerprintMu.RUnlock()
-	d.pubKeyFingerprintMu.Lock()
-	defer d.pubKeyFingerprintMu.Unlock()
+func getPublicKeyFingerprint(pk *rsa.PublicKey) (string, error) {
 	p, err := ssh.NewPublicKey(pk)
 	if err != nil {
 		return "", errors.Wrap(err, "Error creating SSH public key")
 	}
 	fingerprint := ssh.FingerprintSHA256(p)
-	d.pubKeyFingerprint = &fingerprint
-	return *d.pubKeyFingerprint, nil
+	return fingerprint, nil
 }
 
 // Validate checks that the token with the given ID has the given value, and returns an
@@ -164,7 +141,7 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 		}
-		fp, err := d.GetPublicKeyFingerprint(d.JWTPublicKey)
+		fp, err := getPublicKeyFingerprint(d.JWTPublicKey)
 		if err != nil {
 			return nil, err
 		}
@@ -212,7 +189,7 @@ func (d Dependencies) CreateJWT(ctx context.Context, token RefreshToken) (string
 		NotBefore: token.CreatedAt.UTC().Add(-1 * time.Hour).Unix(),
 		Subject:   token.ProfileID,
 	})
-	fp, err := d.GetPublicKeyFingerprint(d.JWTPublicKey)
+	fp, err := getPublicKeyFingerprint(d.JWTPublicKey)
 	if err != nil {
 		return "", err
 	}

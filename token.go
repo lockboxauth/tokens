@@ -3,6 +3,7 @@ package tokens
 import (
 	"context"
 	"crypto/rsa"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 
 	jwt "github.com/dgrijalva/jwt-go"
 	uuid "github.com/hashicorp/go-uuid"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -128,7 +128,7 @@ type Dependencies struct {
 func getPublicKeyFingerprint(pk *rsa.PublicKey) (string, error) {
 	p, err := ssh.NewPublicKey(pk)
 	if err != nil {
-		return "", errors.Wrap(err, "Error creating SSH public key")
+		return "", fmt.Errorf("Error creating SSH public key: %w", err)
 	}
 	fingerprint := ssh.FingerprintSHA256(p)
 	return fingerprint, nil

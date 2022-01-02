@@ -7,12 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/crypto/ssh"
-
-	yall "yall.in"
-
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	uuid "github.com/hashicorp/go-uuid"
+	"golang.org/x/crypto/ssh"
+	yall "yall.in"
 )
 
 const (
@@ -154,12 +152,12 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 		yall.FromContext(ctx).WithError(err).Debug("Error validating token.")
 		return RefreshToken{}, ErrInvalidToken
 	}
-	claims, ok := tok.Claims.(*jwt.StandardClaims)
+	claims, ok := tok.Claims.(*jwt.RegisteredClaims)
 	if !ok {
 		return RefreshToken{}, ErrInvalidToken
 	}
-	log := yall.FromContext(ctx).WithField("id", claims.Id)
-	token, err := d.Storer.GetToken(ctx, claims.Id)
+	log := yall.FromContext(ctx).WithField("id", claims.ID)
+	token, err := d.Storer.GetToken(ctx, claims.ID)
 	if err == ErrTokenNotFound {
 		return RefreshToken{}, ErrInvalidToken
 	} else if err != nil {
@@ -180,13 +178,13 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 // CreateJWT returns a signed JWT for `token`, using the private key set in
 // `d.JWTPrivateKey` as the private key to sign with.
 func (d Dependencies) CreateJWT(ctx context.Context, token RefreshToken) (string, error) {
-	t := jwt.NewWithClaims(jwt.SigningMethodRS256, &jwt.StandardClaims{
-		Audience:  token.ClientID,
-		ExpiresAt: token.CreatedAt.UTC().Add(refreshLength).Unix(),
-		Id:        token.ID,
-		IssuedAt:  token.CreatedAt.UTC().Unix(),
+	t := jwt.NewWithClaims(jwt.SigningMethodRS256, &jwt.RegisteredClaims{
+		Audience:  jwt.ClaimStrings{token.ClientID},
+		ExpiresAt: jwt.NewNumericDate(token.CreatedAt.UTC().Add(refreshLength)),
+		ID:        token.ID,
+		IssuedAt:  jwt.NewNumericDate(token.CreatedAt.UTC()),
 		Issuer:    d.ServiceID,
-		NotBefore: token.CreatedAt.UTC().Add(-1 * time.Hour).Unix(),
+		NotBefore: jwt.NewNumericDate(token.CreatedAt.UTC().Add(-1 * time.Hour)),
 		Subject:   token.ProfileID,
 	})
 	fp, err := getPublicKeyFingerprint(d.JWTPublicKey)

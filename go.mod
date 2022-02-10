@@ -2,7 +2,7 @@ module lockbox.dev/tokens
 
 require (
 	darlinggo.co/pan v0.2.0
-	github.com/golang-jwt/jwt/v4 v4.2.0
+	github.com/golang-jwt/jwt/v4 v4.3.0
 	github.com/hashicorp/go-memdb v1.3.2
 	github.com/hashicorp/go-uuid v1.0.2
 	github.com/lib/pq v1.10.4

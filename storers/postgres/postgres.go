@@ -108,6 +108,9 @@ func updateTokensSQL(ctx context.Context, change tokens.RefreshTokenChange) *pan
 	if change.ProfileID != "" {
 		query.Comparison(t, "ProfileID", "=", change.ProfileID)
 	}
+	if change.AccountID != "" {
+		query.Comparison(t, "AccountID", "=", change.AccountID)
+	}
 	return query.Flush(" AND ")
 }
 

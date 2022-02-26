@@ -3,6 +3,7 @@
 // sql/tokens_20160227_init.sql
 // sql/tokens_20160522_hashing.sql
 // sql/tokens_20161126_jwt.sql
+// sql/tokens_20220226_account_id.sql
 // DO NOT EDIT!
 
 package migrations
@@ -130,6 +131,26 @@ func sqlTokens_20161126_jwtSql() (*asset, error) {
 	return a, nil
 }
 
+var _sqlTokens_20220226_account_idSql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\xd2\xd5\x55\xd0\xce\xcd\x4c\x2f\x4a\x2c\x49\x55\x08\x2d\xe0\x72\xf4\x09\x71\x0d\x52\x08\x71\x74\xf2\x71\x55\x28\xc9\xcf\x4e\xcd\x2b\x56\x70\x74\x71\x51\x70\xf6\xf7\x09\xf5\xf5\x53\x48\x4c\x4e\xce\x2f\xcd\x2b\x89\xcf\x4c\x51\x08\x73\x0c\x72\xf6\x70\x0c\xd2\x30\x36\xd3\x54\xf0\xf3\x0f\x51\xf0\x0b\xf5\xf1\x51\x70\x71\x75\x73\x0c\xf5\x09\x51\x50\x57\xb7\xe6\xe2\x42\x36\xd9\x25\xbf\x3c\x0f\x9b\xd9\x2e\x41\xfe\x01\x30\xc3\x3d\xdd\x14\x5c\x23\x3c\x83\x43\x82\x91\xac\xb1\xe6\x02\x04\x00\x00\xff\xff\x19\xe8\xcf\x58\xa0\x00\x00\x00")
+
+func sqlTokens_20220226_account_idSqlBytes() ([]byte, error) {
+	return bindataRead(
+		_sqlTokens_20220226_account_idSql,
+		"sql/tokens_20220226_account_id.sql",
+	)
+}
+
+func sqlTokens_20220226_account_idSql() (*asset, error) {
+	bytes, err := sqlTokens_20220226_account_idSqlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "sql/tokens_20220226_account_id.sql", size: 160, mode: os.FileMode(436), modTime: time.Unix(1645876369, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -185,6 +206,7 @@ var _bindata = map[string]func() (*asset, error){
 	"sql/tokens_20160227_init.sql": sqlTokens_20160227_initSql,
 	"sql/tokens_20160522_hashing.sql": sqlTokens_20160522_hashingSql,
 	"sql/tokens_20161126_jwt.sql": sqlTokens_20161126_jwtSql,
+	"sql/tokens_20220226_account_id.sql": sqlTokens_20220226_account_idSql,
 }
 
 // AssetDir returns the file names below a certain
@@ -231,6 +253,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 		"tokens_20160227_init.sql": &bintree{sqlTokens_20160227_initSql, map[string]*bintree{}},
 		"tokens_20160522_hashing.sql": &bintree{sqlTokens_20160522_hashingSql, map[string]*bintree{}},
 		"tokens_20161126_jwt.sql": &bintree{sqlTokens_20161126_jwtSql, map[string]*bintree{}},
+		"tokens_20220226_account_id.sql": &bintree{sqlTokens_20220226_account_idSql, map[string]*bintree{}},
 	}},
 }}
 

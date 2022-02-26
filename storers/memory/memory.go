@@ -31,6 +31,11 @@ var (
 						Unique:  false,
 						Indexer: &memdb.StringFieldIndex{Field: "ClientID", Lowercase: true},
 					},
+					"accountID": &memdb.IndexSchema{
+						Name:    "accountID",
+						Unique:  false,
+						Indexer: &memdb.StringFieldIndex{Field: "AccountID", Lowercase: true},
+					},
 				},
 			},
 		},
@@ -104,12 +109,14 @@ func (m *Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenCha
 
 	var iter memdb.ResultIterator
 	var err error
-	if change.ID != "" && change.ProfileID == "" && change.ClientID == "" {
+	if change.ID != "" && change.ProfileID == "" && change.ClientID == "" && change.AccountID == "" {
 		iter, err = txn.Get("token", "id", change.ID)
-	} else if change.ProfileID != "" && change.ClientID == "" && change.ID == "" {
+	} else if change.ProfileID != "" && change.ClientID == "" && change.ID == "" && change.AccountID == "" {
 		iter, err = txn.Get("token", "profileID", change.ProfileID)
-	} else if change.ClientID != "" && change.ProfileID == "" && change.ID == "" {
+	} else if change.ClientID != "" && change.ProfileID == "" && change.ID == "" && change.AccountID == "" {
 		iter, err = txn.Get("token", "clientID", change.ClientID)
+	} else if change.AccountID != "" && change.ProfileID == "" && change.ID == "" && change.ClientID == "" {
+		iter, err = txn.Get("token", "accountID", change.AccountID)
 	} else {
 		iter, err = txn.Get("token", "id")
 	}
@@ -130,6 +137,9 @@ func (m *Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenCha
 			continue
 		}
 		if change.ClientID != "" && tok.ClientID != change.ClientID {
+			continue
+		}
+		if change.AccountID != "" && tok.AccountID != change.AccountID {
 			continue
 		}
 		updated := tokens.ApplyChange(tok, change)

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	uuid "github.com/hashicorp/go-uuid"
 	yall "yall.in"
 	"yall.in/colour"
@@ -32,6 +33,7 @@ const (
 	filterID = 1 << iota
 	filterProfileID
 	filterClientID
+	filterAccountID
 	filterVariations
 )
 
@@ -49,39 +51,6 @@ func uuidOrFail(t *testing.T) string {
 		t.Fatalf("Unexpected error generating ID: %s", err.Error())
 	}
 	return id
-}
-
-func compareRefreshTokens(token1, token2 tokens.RefreshToken) (success bool, field string, val1, val2 interface{}) {
-	if token1.ID != token2.ID {
-		return false, "ID", token1.ID, token2.ID
-	}
-	if !token1.CreatedAt.Equal(token2.CreatedAt) {
-		return false, "CreatedAt", token1.CreatedAt, token2.CreatedAt
-	}
-	if token1.CreatedFrom != token2.CreatedFrom {
-		return false, "CreatedFrom", token1.CreatedFrom, token2.CreatedFrom
-	}
-	if len(token1.Scopes) != len(token2.Scopes) {
-		return false, "Scopes", token1.Scopes, token2.Scopes
-	}
-	for pos, scope := range token1.Scopes {
-		if scope != token2.Scopes[pos] {
-			return false, "Scopes", token1.Scopes, token2.Scopes
-		}
-	}
-	if token1.ProfileID != token2.ProfileID {
-		return false, "ProfileID", token1.ProfileID, token2.ProfileID
-	}
-	if token1.ClientID != token2.ClientID {
-		return false, "ClientID", token1.ClientID, token2.ClientID
-	}
-	if token1.Revoked != token2.Revoked {
-		return false, "Revoked", token1.Revoked, token2.Revoked
-	}
-	if token1.Used != token2.Used {
-		return false, "Used", token1.Used, token2.Used
-	}
-	return true, "", nil, nil
 }
 
 func TestMain(m *testing.M) {
@@ -136,6 +105,7 @@ func TestCreateAndGetToken(t *testing.T) {
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
 			Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
+			AccountID:   uuidOrFail(t),
 			ProfileID:   uuidOrFail(t),
 			ClientID:    uuidOrFail(t),
 			Revoked:     false,
@@ -151,9 +121,8 @@ func TestCreateAndGetToken(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error retrieving token: %+v\n", err)
 		}
-		ok, field, expected, got := compareRefreshTokens(token, result)
-		if !ok {
-			t.Errorf("Expected %s to be %v, got %v\n", field, expected, got)
+		if diff := cmp.Diff(token, result); diff != "" {
+			t.Errorf("Unexpected diff (-wanted, +got): %s", diff)
 		}
 	})
 }
@@ -166,6 +135,7 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
 			Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
+			AccountID:   uuidOrFail(t),
 			ProfileID:   uuidOrFail(t),
 			ClientID:    uuidOrFail(t),
 			Revoked:     false,
@@ -192,6 +162,7 @@ func TestUseTokenErrTokenUsed(t *testing.T) {
 			CreatedAt:   time.Now().Add(-1 * time.Hour).Round(time.Millisecond),
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
 			Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
+			AccountID:   uuidOrFail(t),
 			ProfileID:   uuidOrFail(t),
 			ClientID:    uuidOrFail(t),
 			Revoked:     false,
@@ -267,6 +238,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				CreatedFrom: fmt.Sprintf("test case for %T", storer),
 				Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
 				ProfileID:   user1,
+				AccountID:   uuidOrFail(t),
 				ClientID:    uuidOrFail(t),
 				Revoked:     false,
 				Used:        true,
@@ -276,6 +248,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				CreatedFrom: fmt.Sprintf("second test case for %T", storer),
 				Scopes:      []string{"this scope", "that scope"},
 				ProfileID:   user1,
+				AccountID:   uuidOrFail(t),
 				ClientID:    uuidOrFail(t),
 				Revoked:     false,
 				Used:        false,
@@ -284,6 +257,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				CreatedAt:   time.Now().Add(1 * time.Minute).Round(time.Millisecond),
 				CreatedFrom: fmt.Sprintf("third test case for %T", storer),
 				ProfileID:   user2,
+				AccountID:   uuidOrFail(t),
 				ClientID:    uuidOrFail(t),
 				Revoked:     true,
 				Used:        false,
@@ -298,6 +272,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 				CreatedFrom: fmt.Sprintf("paginated test case %d for %T", i, storer),
 				ProfileID:   user3,
 				ClientID:    uuidOrFail(t),
+				AccountID:   uuidOrFail(t),
 				Revoked:     i%2 == 0,
 				Used:        i%2 != 0,
 			})
@@ -327,7 +302,7 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 		testcases := []testcase{
 			{user: user1, expectations: []tokens.RefreshToken{toks[1], toks[0]}},
 			{user: user2, expectations: []tokens.RefreshToken{toks[2]}},
-			{user: uuidOrFail(t), expectations: []tokens.RefreshToken{}},
+			{user: uuidOrFail(t), expectations: nil},
 			{user: user1, before: time.Now(), expectations: []tokens.RefreshToken{toks[0]}},
 			{user: user1, since: time.Now(), expectations: []tokens.RefreshToken{toks[1]}},
 			{user: user3, expectations: dynamicToks[:tokens.NumTokenResults]},
@@ -351,13 +326,8 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 					t.Fatalf("Expected %d results, got %d: %+v\n", len(tc.expectations), len(results), results)
 				}
 
-				for pos, expectation := range tc.expectations {
-					t.Run(fmt.Sprintf("Token=%d", pos), func(t *testing.T) {
-						ok, field, exp, res := compareRefreshTokens(expectation, results[pos])
-						if !ok {
-							t.Errorf("Expected %s to be %v, got %v\n", field, exp, res)
-						}
-					})
+				if diff := cmp.Diff(tc.expectations, results); diff != "" {
+					t.Errorf("Unexpected diff (-wanted, +got): %s", diff)
 				}
 			})
 		}
@@ -373,6 +343,7 @@ func TestCreateUpdateTokenNoChangeFilter(t *testing.T) {
 			CreatedFrom: fmt.Sprintf("test case for %T", storer),
 			Scopes:      []string{"https://scopes.impractical.co/this/is/a/very/long/scope/that/is/pretty/long/I/hope/the/database/can/store/this/super/long/scope/that/is/probably/unrealistically/long/but/still/it's/good/to/test/things/like/this", "https://scopes.impractical.co/profiles/view:me"},
 			ProfileID:   uuidOrFail(t),
+			AccountID:   uuidOrFail(t),
 			ClientID:    uuidOrFail(t),
 			Revoked:     false,
 			Used:        true,
@@ -410,6 +381,9 @@ func TestCreateAndUpdateTokensByFilters(t *testing.T) {
 			if filters&filterClientID != 0 {
 				filterNames = append(filterNames, "clientID")
 			}
+			if filters&filterAccountID != 0 {
+				filterNames = append(filterNames, "accountID")
+			}
 			t.Run(fmt.Sprintf("Filters=%s", strings.Join(filterNames, ",")), func(t *testing.T) {
 				for i := 1; i <= changeVariations; i++ {
 					i := i
@@ -425,38 +399,38 @@ func TestCreateAndUpdateTokensByFilters(t *testing.T) {
 						profile2 := uuidOrFail(t)
 						profile3 := uuidOrFail(t)
 
-						var client, profile string
+						account1 := uuidOrFail(t)
+						account2 := uuidOrFail(t)
+						account3 := uuidOrFail(t)
 
-						toks := make([]tokens.RefreshToken, 0, 100)
+						var client, profile, account string
+
+						toks := make([]tokens.RefreshToken, 0, 300)
 						for i := 0; i < 100; i++ {
-							switch i % 9 {
+							cycle := i % 27
+							switch cycle % 3 {
 							case 0:
-								client = client1
-								profile = profile1
+								account = account1
 							case 1:
-								client = client1
-								profile = profile2
+								account = account2
 							case 2:
+								account = account3
+							}
+							switch {
+							case cycle%9 < 3:
+								profile = profile1
+							case cycle%9 >= 3 && cycle%9 < 6:
+								profile = profile2
+							case cycle%9 >= 6:
+								profile = profile3
+							}
+							switch {
+							case cycle < 9:
 								client = client1
-								profile = profile3
-							case 3:
+							case cycle >= 9 && cycle < 18:
 								client = client2
-								profile = profile1
-							case 4:
-								client = client2
-								profile = profile2
-							case 5:
-								client = client2
-								profile = profile3
-							case 6:
+							case cycle >= 18:
 								client = client3
-								profile = profile1
-							case 7:
-								client = client3
-								profile = profile2
-							case 8:
-								client = client3
-								profile = profile3
 							}
 							toks = append(toks, tokens.RefreshToken{
 								ID:          uuidOrFail(t),
@@ -464,6 +438,7 @@ func TestCreateAndUpdateTokensByFilters(t *testing.T) {
 								CreatedFrom: fmt.Sprintf("test case %d for %T", i, storer),
 								ClientID:    client,
 								ProfileID:   profile,
+								AccountID:   account,
 								Revoked:     i%2 == 0,
 								Used:        i%2 != 0,
 							})
@@ -488,6 +463,9 @@ func TestCreateAndUpdateTokensByFilters(t *testing.T) {
 						if filters&filterClientID != 0 {
 							change.ClientID = client3
 						}
+						if filters&filterAccountID != 0 {
+							change.AccountID = account1
+						}
 
 						if i&changeRevoked != 0 {
 							revoked = i%2 == 0
@@ -506,16 +484,16 @@ func TestCreateAndUpdateTokensByFilters(t *testing.T) {
 							expectation := tok
 							if (change.ID == "" || tok.ID == change.ID) &&
 								(change.ProfileID == "" || tok.ProfileID == change.ProfileID) &&
-								(change.ClientID == "" || tok.ClientID == change.ClientID) {
+								(change.ClientID == "" || tok.ClientID == change.ClientID) &&
+								(change.AccountID == "" || tok.AccountID == change.AccountID) {
 								expectation = tokens.ApplyChange(expectation, change)
 							}
 							result, err := storer.GetToken(ctx, tok.ID)
 							if err != nil {
 								t.Fatalf("Error retrieving token from %T: %+v\n", storer, err)
 							}
-							ok, field, expectedVal, resultVal := compareRefreshTokens(expectation, result)
-							if !ok {
-								t.Errorf("Expected %s of change %d (ID %s) to be %v, got %v from %T\n", field, i, tok.ID, expectedVal, resultVal, storer)
+							if diff := cmp.Diff(expectation, result); diff != "" {
+								t.Errorf("Unexpected diff on change %d (ID %s): %s", i, tok.ID, diff)
 							}
 						}
 					})

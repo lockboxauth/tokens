@@ -15,6 +15,7 @@ type RefreshToken struct {
 	Scopes      pqarrays.StringArray
 	ProfileID   string
 	ClientID    string
+	AccountID   string
 	Revoked     bool
 	Used        bool
 }
@@ -27,6 +28,7 @@ func fromPostgres(t RefreshToken) tokens.RefreshToken {
 		Scopes:      []string(t.Scopes),
 		ProfileID:   t.ProfileID,
 		ClientID:    t.ClientID,
+		AccountID:   t.AccountID,
 		Revoked:     t.Revoked,
 		Used:        t.Used,
 	}
@@ -40,6 +42,7 @@ func toPostgres(t tokens.RefreshToken) RefreshToken {
 		Scopes:      pqarrays.StringArray(t.Scopes),
 		ProfileID:   t.ProfileID,
 		ClientID:    t.ClientID,
+		AccountID:   t.AccountID,
 		Revoked:     t.Revoked,
 		Used:        t.Used,
 	}

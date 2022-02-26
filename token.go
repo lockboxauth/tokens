@@ -43,6 +43,7 @@ type RefreshToken struct {
 	CreatedAt   time.Time
 	CreatedFrom string
 	Scopes      []string
+	AccountID   string
 	ProfileID   string
 	ClientID    string
 	Revoked     bool
@@ -57,6 +58,7 @@ type RefreshToken struct {
 // the property won't be updated.
 type RefreshTokenChange struct {
 	ID        string
+	AccountID string
 	ProfileID string
 	ClientID  string
 
@@ -79,6 +81,9 @@ func (r RefreshTokenChange) HasFilter() bool {
 		return true
 	}
 	if r.ClientID != "" {
+		return true
+	}
+	if r.AccountID != "" {
 		return true
 	}
 	return false

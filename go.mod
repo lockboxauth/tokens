@@ -5,7 +5,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.4.1
 	github.com/google/go-cmp v0.5.7
 	github.com/hashicorp/go-memdb v1.3.2
-	github.com/hashicorp/go-uuid v1.0.2
+	github.com/hashicorp/go-uuid v1.0.3
 	github.com/lib/pq v1.10.5
 	github.com/rubenv/sql-migrate v0.0.0-20200616145509-8d140a17f351
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad

@@ -3,6 +3,7 @@ package tokens_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -81,8 +82,7 @@ func TestMain(m *testing.M) {
 	os.Exit(result)
 }
 
-func runTest(t *testing.T, f func(*testing.T, tokens.Storer, context.Context)) {
-	t.Parallel()
+func runTest(t *testing.T, testFunc func(*testing.T, tokens.Storer, context.Context)) {
 	logger := yall.New(colour.New(os.Stdout, yall.Debug))
 	for _, factory := range factories {
 		ctx := yall.InContext(context.Background(), logger)
@@ -92,12 +92,14 @@ func runTest(t *testing.T, f func(*testing.T, tokens.Storer, context.Context)) {
 		}
 		t.Run(fmt.Sprintf("Storer=%T", storer), func(t *testing.T) {
 			t.Parallel()
-			f(t, storer, ctx)
+			testFunc(t, storer, ctx)
 		})
 	}
 }
 
 func TestCreateAndGetToken(t *testing.T) {
+	t.Parallel()
+
 	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
 		token := tokens.RefreshToken{
 			ID: uuidOrFail(t),
@@ -128,6 +130,8 @@ func TestCreateAndGetToken(t *testing.T) {
 }
 
 func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
+	t.Parallel()
+
 	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
 		token := tokens.RefreshToken{
 			ID: uuidOrFail(t),
@@ -148,13 +152,15 @@ func TestCreateTokenErrTokenAlreadyExists(t *testing.T) {
 		}
 
 		err = storer.CreateToken(ctx, token)
-		if err != tokens.ErrTokenAlreadyExists {
+		if !errors.Is(err, tokens.ErrTokenAlreadyExists) {
 			t.Errorf("Expected tokens.ErrTokenAlreadyExists, %T returned %+v\n", storer, err)
 		}
 	})
 }
 
 func TestUseTokenErrTokenUsed(t *testing.T) {
+	t.Parallel()
+
 	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
 		token := tokens.RefreshToken{
 			ID: uuidOrFail(t),
@@ -175,21 +181,21 @@ func TestUseTokenErrTokenUsed(t *testing.T) {
 		}
 		var usedErrors int
 		var successes int
-		var wg sync.WaitGroup
-		ch := make(chan error)
+		var tokenUsers sync.WaitGroup
+		errChan := make(chan error)
 		for i := 0; i < 20; i++ {
-			wg.Add(1)
+			tokenUsers.Add(1)
 			go func(w *sync.WaitGroup, c chan error) {
 				c <- storer.UseToken(ctx, token.ID)
 				w.Done()
-			}(&wg, ch)
+			}(&tokenUsers, errChan)
 		}
 		go func(w *sync.WaitGroup, c chan error) {
 			w.Wait()
 			close(c)
-		}(&wg, ch)
-		for err := range ch {
-			if err == tokens.ErrTokenUsed {
+		}(&tokenUsers, errChan)
+		for err := range errChan {
+			if errors.Is(err, tokens.ErrTokenUsed) {
 				usedErrors++
 			} else if err == nil {
 				successes++
@@ -207,24 +213,30 @@ func TestUseTokenErrTokenUsed(t *testing.T) {
 }
 
 func TestUseTokenErrTokenNotFound(t *testing.T) {
+	t.Parallel()
+
 	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
 		err := storer.UseToken(ctx, uuidOrFail(t))
-		if err != tokens.ErrTokenNotFound {
+		if !errors.Is(err, tokens.ErrTokenNotFound) {
 			t.Errorf("Expected ErrTokenNotFound, %T returned %+v\n", storer, err)
 		}
 	})
 }
 
 func TestGetTokenErrTokenNotFound(t *testing.T) {
+	t.Parallel()
+
 	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
 		token, err := storer.GetToken(ctx, uuidOrFail(t))
-		if err != tokens.ErrTokenNotFound {
+		if !errors.Is(err, tokens.ErrTokenNotFound) {
 			t.Errorf("Expected tokens.ErrTokenNotFound, %T returned %+v and %+v\n", storer, token, err)
 		}
 	})
 }
 
 func TestCreateAndGetTokensByProfileID(t *testing.T) {
+	t.Parallel()
+
 	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
 		user1 := uuidOrFail(t)
 		user2 := uuidOrFail(t)
@@ -265,16 +277,16 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 		}
 
 		var dynamicToks []tokens.RefreshToken
-		for i := 0; i < 100; i++ {
+		for tokenNum := 0; tokenNum < 100; tokenNum++ {
 			dynamicToks = append(dynamicToks, tokens.RefreshToken{
 				ID:          uuidOrFail(t),
-				CreatedAt:   time.Now().Add(time.Duration(i) * time.Second).Round(time.Millisecond),
-				CreatedFrom: fmt.Sprintf("paginated test case %d for %T", i, storer),
+				CreatedAt:   time.Now().Add(time.Duration(tokenNum) * time.Second).Round(time.Millisecond),
+				CreatedFrom: fmt.Sprintf("paginated test case %d for %T", tokenNum, storer),
 				ProfileID:   user3,
 				ClientID:    uuidOrFail(t),
 				AccountID:   uuidOrFail(t),
-				Revoked:     i%2 == 0,
-				Used:        i%2 != 0,
+				Revoked:     tokenNum%2 == 0,
+				Used:        tokenNum%2 != 0,
 			})
 		}
 		sort.Slice(dynamicToks, func(i, j int) bool {
@@ -311,22 +323,22 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 			{user: user3, before: dynamicToks[3*tokens.NumTokenResults-1].CreatedAt, expectations: dynamicToks[tokens.NumTokenResults*3 : tokens.NumTokenResults*4]},
 		}
 
-		for pos, tc := range testcases {
-			pos, tc := pos, tc
+		for pos, test := range testcases {
+			pos, test := pos, test
 
 			t.Run(fmt.Sprintf("Case=%d", pos), func(t *testing.T) {
 				t.Parallel()
-				results, err := storer.GetTokensByProfileID(ctx, tc.user, tc.since, tc.before)
+				results, err := storer.GetTokensByProfileID(ctx, test.user, test.since, test.before)
 				if err != nil {
 					t.Fatalf("Error retrieving tokens from %T: %+v\n", storer, err)
 				}
 
-				if len(tc.expectations) != len(results) {
-					t.Logf("%+v\n", tc.expectations)
-					t.Fatalf("Expected %d results, got %d: %+v\n", len(tc.expectations), len(results), results)
+				if len(test.expectations) != len(results) {
+					t.Logf("%+v\n", test.expectations)
+					t.Fatalf("Expected %d results, got %d: %+v\n", len(test.expectations), len(results), results)
 				}
 
-				if diff := cmp.Diff(tc.expectations, results); diff != "" {
+				if diff := cmp.Diff(test.expectations, results); diff != "" {
 					t.Errorf("Unexpected diff (-wanted, +got): %s", diff)
 				}
 			})
@@ -335,6 +347,8 @@ func TestCreateAndGetTokensByProfileID(t *testing.T) {
 }
 
 func TestCreateUpdateTokenNoChangeFilter(t *testing.T) {
+	t.Parallel()
+
 	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
 		token := tokens.RefreshToken{
 			ID: uuidOrFail(t),
@@ -361,13 +375,15 @@ func TestCreateUpdateTokenNoChangeFilter(t *testing.T) {
 		}
 
 		err = storer.UpdateTokens(ctx, change)
-		if err != tokens.ErrNoTokenChangeFilter {
+		if !errors.Is(err, tokens.ErrNoTokenChangeFilter) {
 			t.Errorf("Expected tokens.ErrNoTokenChangeFilter, %T returned %+v\n", storer, err)
 		}
 	})
 }
 
 func TestCreateAndUpdateTokensByFilters(t *testing.T) {
+	t.Parallel()
+
 	runTest(t, func(t *testing.T, storer tokens.Storer, ctx context.Context) {
 		for filters := 1; filters < filterVariations; filters++ {
 			filters := filters
@@ -385,9 +401,9 @@ func TestCreateAndUpdateTokensByFilters(t *testing.T) {
 				filterNames = append(filterNames, "accountID")
 			}
 			t.Run(fmt.Sprintf("Filters=%s", strings.Join(filterNames, ",")), func(t *testing.T) {
-				for i := 1; i <= changeVariations; i++ {
-					i := i
-					t.Run(fmt.Sprintf("Variation=%d", i), func(t *testing.T) {
+				for variation := 1; variation <= changeVariations; variation++ {
+					variation := variation
+					t.Run(fmt.Sprintf("Variation=%d", variation), func(t *testing.T) {
 						t.Parallel()
 						var change tokens.RefreshTokenChange
 						var revoked, used bool
@@ -406,8 +422,8 @@ func TestCreateAndUpdateTokensByFilters(t *testing.T) {
 						var client, profile, account string
 
 						toks := make([]tokens.RefreshToken, 0, 300)
-						for i := 0; i < 100; i++ {
-							cycle := i % 27
+						for tokenNum := 0; tokenNum < 100; tokenNum++ {
+							cycle := tokenNum % 27
 							switch cycle % 3 {
 							case 0:
 								account = account1
@@ -434,13 +450,13 @@ func TestCreateAndUpdateTokensByFilters(t *testing.T) {
 							}
 							toks = append(toks, tokens.RefreshToken{
 								ID:          uuidOrFail(t),
-								CreatedAt:   time.Now().Add(time.Duration(i) * time.Second).Round(time.Millisecond),
-								CreatedFrom: fmt.Sprintf("test case %d for %T", i, storer),
+								CreatedAt:   time.Now().Add(time.Duration(tokenNum) * time.Second).Round(time.Millisecond),
+								CreatedFrom: fmt.Sprintf("test case %d for %T", tokenNum, storer),
 								ClientID:    client,
 								ProfileID:   profile,
 								AccountID:   account,
-								Revoked:     i%2 == 0,
-								Used:        i%2 != 0,
+								Revoked:     tokenNum%2 == 0,
+								Used:        tokenNum%2 != 0,
 							})
 						}
 						sort.Slice(toks, func(i, j int) bool {
@@ -467,12 +483,12 @@ func TestCreateAndUpdateTokensByFilters(t *testing.T) {
 							change.AccountID = account1
 						}
 
-						if i&changeRevoked != 0 {
-							revoked = i%2 == 0
+						if variation&changeRevoked != 0 {
+							revoked = variation%2 == 0
 							change.Revoked = &revoked
 						}
-						if i&changeUsed != 0 {
-							used = i%2 != 0
+						if variation&changeUsed != 0 {
+							used = variation%2 != 0
 							change.Used = &used
 						}
 
@@ -493,7 +509,7 @@ func TestCreateAndUpdateTokensByFilters(t *testing.T) {
 								t.Fatalf("Error retrieving token from %T: %+v\n", storer, err)
 							}
 							if diff := cmp.Diff(expectation, result); diff != "" {
-								t.Errorf("Unexpected diff on change %d (ID %s): %s", i, tok.ID, diff)
+								t.Errorf("Unexpected diff on change %d (ID %s): %s", variation, tok.ID, diff)
 							}
 						}
 					})

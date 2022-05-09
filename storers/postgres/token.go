@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"impractical.co/pqarrays"
+
 	"lockbox.dev/tokens"
 )
 
@@ -20,36 +21,36 @@ type RefreshToken struct {
 	Used        bool
 }
 
-func fromPostgres(t RefreshToken) tokens.RefreshToken {
+func fromPostgres(token RefreshToken) tokens.RefreshToken {
 	return tokens.RefreshToken{
-		ID:          t.ID,
-		CreatedAt:   t.CreatedAt,
-		CreatedFrom: t.CreatedFrom,
-		Scopes:      []string(t.Scopes),
-		ProfileID:   t.ProfileID,
-		ClientID:    t.ClientID,
-		AccountID:   t.AccountID,
-		Revoked:     t.Revoked,
-		Used:        t.Used,
+		ID:          token.ID,
+		CreatedAt:   token.CreatedAt,
+		CreatedFrom: token.CreatedFrom,
+		Scopes:      []string(token.Scopes),
+		ProfileID:   token.ProfileID,
+		ClientID:    token.ClientID,
+		AccountID:   token.AccountID,
+		Revoked:     token.Revoked,
+		Used:        token.Used,
 	}
 }
 
-func toPostgres(t tokens.RefreshToken) RefreshToken {
+func toPostgres(token tokens.RefreshToken) RefreshToken {
 	return RefreshToken{
-		ID:          t.ID,
-		CreatedAt:   t.CreatedAt,
-		CreatedFrom: t.CreatedFrom,
-		Scopes:      pqarrays.StringArray(t.Scopes),
-		ProfileID:   t.ProfileID,
-		ClientID:    t.ClientID,
-		AccountID:   t.AccountID,
-		Revoked:     t.Revoked,
-		Used:        t.Used,
+		ID:          token.ID,
+		CreatedAt:   token.CreatedAt,
+		CreatedFrom: token.CreatedFrom,
+		Scopes:      pqarrays.StringArray(token.Scopes),
+		ProfileID:   token.ProfileID,
+		ClientID:    token.ClientID,
+		AccountID:   token.AccountID,
+		Revoked:     token.Revoked,
+		Used:        token.Used,
 	}
 }
 
 // GetSQLTableName returns the name of the PostgreSQL table RefreshTokens will be stored
 // in. It is required for use with pan.
-func (t RefreshToken) GetSQLTableName() string {
+func (RefreshToken) GetSQLTableName() string {
 	return "tokens"
 }

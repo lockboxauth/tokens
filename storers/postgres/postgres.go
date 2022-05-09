@@ -3,10 +3,12 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"darlinggo.co/pan"
 	"github.com/lib/pq"
+	"yall.in"
 
 	"lockbox.dev/tokens"
 )
@@ -14,6 +16,10 @@ import (
 //go:generate go-bindata -pkg migrations -o migrations/generated.go sql/
 
 const (
+	// TestConnStringEnvVar is the environment variable to use when
+	// specifying a connection string for the database to run tests
+	// against. Tests will run in their own isolated databases, not in the
+	// default database the connection string is for.
 	TestConnStringEnvVar = "PG_TEST_DB"
 )
 
@@ -24,11 +30,11 @@ type Storer struct {
 }
 
 // NewStorer returns an instance of Storer that is ready to be used as a Storer.
-func NewStorer(ctx context.Context, db *sql.DB) Storer {
+func NewStorer(_ context.Context, db *sql.DB) Storer {
 	return Storer{db: db}
 }
 
-func getTokenSQL(ctx context.Context, token string) *pan.Query {
+func getTokenSQL(_ context.Context, token string) *pan.Query {
 	var t RefreshToken
 	query := pan.New("SELECT " + pan.Columns(t).String() + " FROM " + pan.Table(t))
 	query.Where()
@@ -44,14 +50,15 @@ func (s Storer) GetToken(ctx context.Context, token string) (tokens.RefreshToken
 	if err != nil {
 		return tokens.RefreshToken{}, err
 	}
-	rows, err := s.db.Query(queryStr, query.Args()...)
+	rows, err := s.db.Query(queryStr, query.Args()...) //nolint:sqlclosecheck // the closeRows helper isn't picked up
 	if err != nil {
 		return tokens.RefreshToken{}, err
 	}
-	var t RefreshToken
+	defer closeRows(ctx, rows)
+	var res RefreshToken
 	var found bool
 	for rows.Next() {
-		err := pan.Unmarshal(rows, &t)
+		err = pan.Unmarshal(rows, &res)
 		if err != nil {
 			return tokens.RefreshToken{}, err
 		}
@@ -63,7 +70,7 @@ func (s Storer) GetToken(ctx context.Context, token string) (tokens.RefreshToken
 	if !found {
 		return tokens.RefreshToken{}, tokens.ErrTokenNotFound
 	}
-	return fromPostgres(t), nil
+	return fromPostgres(res), nil
 }
 
 func createTokenSQL(token tokens.RefreshToken) *pan.Query {
@@ -74,42 +81,41 @@ func createTokenSQL(token tokens.RefreshToken) *pan.Query {
 // CreateToken inserts the passed tokens.RefreshToken into Storer. If a tokens.RefreshToken
 // with the same ID already exists in Storer, an ErrTokenAlreadyExists error
 // will be returned, and the tokens.RefreshToken will not be inserted.
-func (s Storer) CreateToken(ctx context.Context, token tokens.RefreshToken) error {
+func (s Storer) CreateToken(_ context.Context, token tokens.RefreshToken) error {
 	query := createTokenSQL(token)
 	queryStr, err := query.PostgreSQLString()
 	if err != nil {
 		return err
 	}
 	_, err = s.db.Exec(queryStr, query.Args()...)
-	if e, ok := err.(*pq.Error); ok {
-		if e.Constraint == "tokens_pkey" {
-			err = tokens.ErrTokenAlreadyExists
-		}
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && pqErr.Constraint == "tokens_pkey" {
+		err = tokens.ErrTokenAlreadyExists
 	}
 	return err
 }
 
-func updateTokensSQL(ctx context.Context, change tokens.RefreshTokenChange) *pan.Query {
-	var t RefreshToken
-	query := pan.New("UPDATE " + pan.Table(t) + " SET ")
+func updateTokensSQL(_ context.Context, change tokens.RefreshTokenChange) *pan.Query {
+	var token RefreshToken
+	query := pan.New("UPDATE " + pan.Table(token) + " SET ")
 	if change.Revoked != nil {
-		query.Comparison(t, "Revoked", "=", change.Revoked)
+		query.Comparison(token, "Revoked", "=", change.Revoked)
 	}
 	if change.Used != nil {
-		query.Comparison(t, "Used", "=", change.Used)
+		query.Comparison(token, "Used", "=", change.Used)
 	}
 	query.Flush(", ").Where()
 	if change.ID != "" {
-		query.Comparison(t, "ID", "=", change.ID)
+		query.Comparison(token, "ID", "=", change.ID)
 	}
 	if change.ClientID != "" {
-		query.Comparison(t, "ClientID", "=", change.ClientID)
+		query.Comparison(token, "ClientID", "=", change.ClientID)
 	}
 	if change.ProfileID != "" {
-		query.Comparison(t, "ProfileID", "=", change.ProfileID)
+		query.Comparison(token, "ProfileID", "=", change.ProfileID)
 	}
 	if change.AccountID != "" {
-		query.Comparison(t, "AccountID", "=", change.AccountID)
+		query.Comparison(token, "AccountID", "=", change.AccountID)
 	}
 	return query.Flush(" AND ")
 }
@@ -132,7 +138,7 @@ func (s Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenChan
 	return err
 }
 
-func useTokenSQL(ctx context.Context, id string) *pan.Query {
+func useTokenSQL(_ context.Context, id string) *pan.Query {
 	var t RefreshToken
 	query := pan.New("UPDATE " + pan.Table(t) + " SET ")
 	query.Comparison(t, "Used", "=", true)
@@ -142,7 +148,7 @@ func useTokenSQL(ctx context.Context, id string) *pan.Query {
 	return query.Flush(" AND ")
 }
 
-func useTokenExistsSQL(ctx context.Context, id string) *pan.Query {
+func useTokenExistsSQL(_ context.Context, id string) *pan.Query {
 	var t RefreshToken
 	query := pan.New("SELECT COUNT(*) FROM " + pan.Table(t))
 	query.Where()
@@ -186,19 +192,19 @@ func (s Storer) UseToken(ctx context.Context, id string) error {
 	return tokens.ErrTokenNotFound
 }
 
-func getTokensByProfileIDSQL(ctx context.Context, profileID string, since, before time.Time) *pan.Query {
-	var t RefreshToken
-	query := pan.New("SELECT " + pan.Columns(t).String() + " FROM " + pan.Table(t))
+func getTokensByProfileIDSQL(_ context.Context, profileID string, since, before time.Time) *pan.Query {
+	var token RefreshToken
+	query := pan.New("SELECT " + pan.Columns(token).String() + " FROM " + pan.Table(token))
 	query.Where()
-	query.Comparison(t, "ProfileID", "=", profileID)
+	query.Comparison(token, "ProfileID", "=", profileID)
 	if !before.IsZero() {
-		query.Comparison(t, "CreatedAt", "<", before)
+		query.Comparison(token, "CreatedAt", "<", before)
 	}
 	if !since.IsZero() {
-		query.Comparison(t, "CreatedAt", ">", since)
+		query.Comparison(token, "CreatedAt", ">", since)
 	}
 	query.Flush(" AND ")
-	query.OrderByDesc(pan.Column(t, "CreatedAt"))
+	query.OrderByDesc(pan.Column(token, "CreatedAt"))
 	query.Limit(tokens.NumTokenResults)
 	return query.Flush(" ")
 }
@@ -215,10 +221,11 @@ func (s Storer) GetTokensByProfileID(ctx context.Context, profileID string, sinc
 	if err != nil {
 		return []tokens.RefreshToken{}, err
 	}
-	rows, err := s.db.Query(queryStr, query.Args()...)
+	rows, err := s.db.Query(queryStr, query.Args()...) //nolint:sqlclosecheck // the closeRows helper isn't picked up
 	if err != nil {
 		return []tokens.RefreshToken{}, err
 	}
+	defer closeRows(ctx, rows)
 	var toks []tokens.RefreshToken
 	for rows.Next() {
 		var token RefreshToken
@@ -232,4 +239,10 @@ func (s Storer) GetTokensByProfileID(ctx context.Context, profileID string, sinc
 		return toks, err
 	}
 	return toks, nil
+}
+
+func closeRows(ctx context.Context, rows *sql.Rows) {
+	if err := rows.Close(); err != nil {
+		yall.FromContext(ctx).WithError(err).Error("failed to close rows")
+	}
 }

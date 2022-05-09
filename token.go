@@ -17,7 +17,7 @@ const (
 	// NumTokenResults is the number of Tokens to retrieve when listing Tokens.
 	NumTokenResults = 25
 
-	refreshLength = time.Duration(time.Hour * 24 * 14)
+	refreshLength = time.Hour * 24 * 14
 )
 
 var (
@@ -35,6 +35,12 @@ var (
 	// ErrNoTokenChangeFilter is returned when a TokenChange is passed to UpdateTokens
 	// that has none of the filtering fields set.
 	ErrNoTokenChangeFilter = errors.New("invalid token change: must have one or more filter fields set")
+	// ErrUnexpectedSigningMethod is returned when validating a token that
+	// claims to have been signed with a unrecognized signing method.
+	ErrUnexpectedSigningMethod = errors.New("unexpected signing method")
+	// ErrUnknownSigningKey is returned when validating a token that claims
+	// to have been signed with an unrecognized signing key.
+	ErrUnknownSigningKey = errors.New("unknown signing key")
 )
 
 // RefreshToken represents a refresh token that can be used to obtain a new access token.
@@ -142,14 +148,14 @@ func getPublicKeyFingerprint(pk *rsa.PublicKey) (string, error) {
 func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken, error) {
 	tok, err := jwt.Parse(jwtVal, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			return nil, fmt.Errorf("%w: %v", ErrUnexpectedSigningMethod, token.Header["alg"])
 		}
 		fp, err := getPublicKeyFingerprint(d.JWTPublicKey)
 		if err != nil {
 			return nil, err
 		}
 		if fp != token.Header["kid"] {
-			return nil, errors.New("unknown signing key")
+			return nil, fmt.Errorf("%w: %v", ErrUnknownSigningKey, token.Header["kid"])
 		}
 		return d.JWTPublicKey, nil
 	})
@@ -163,7 +169,7 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 	}
 	log := yall.FromContext(ctx).WithField("id", claims.ID)
 	token, err := d.Storer.GetToken(ctx, claims.ID)
-	if err == ErrTokenNotFound {
+	if errors.Is(err, ErrTokenNotFound) {
 		return RefreshToken{}, ErrInvalidToken
 	} else if err != nil {
 		log.WithError(err).Error("error retrieving token")
@@ -182,8 +188,8 @@ func (d Dependencies) Validate(ctx context.Context, jwtVal string) (RefreshToken
 
 // CreateJWT returns a signed JWT for `token`, using the private key set in
 // `d.JWTPrivateKey` as the private key to sign with.
-func (d Dependencies) CreateJWT(ctx context.Context, token RefreshToken) (string, error) {
-	t := jwt.NewWithClaims(jwt.SigningMethodRS256, &jwt.RegisteredClaims{
+func (d Dependencies) CreateJWT(_ context.Context, token RefreshToken) (string, error) {
+	res := jwt.NewWithClaims(jwt.SigningMethodRS256, &jwt.RegisteredClaims{
 		Audience:  jwt.ClaimStrings{token.ClientID},
 		ExpiresAt: jwt.NewNumericDate(token.CreatedAt.UTC().Add(refreshLength)),
 		ID:        token.ID,
@@ -196,6 +202,6 @@ func (d Dependencies) CreateJWT(ctx context.Context, token RefreshToken) (string
 	if err != nil {
 		return "", err
 	}
-	t.Header["kid"] = fp
-	return t.SignedString(d.JWTPrivateKey)
+	res.Header["kid"] = fp
+	return res.SignedString(d.JWTPrivateKey)
 }

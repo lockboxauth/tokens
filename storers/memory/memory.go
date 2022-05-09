@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
@@ -60,7 +61,7 @@ func NewStorer() (*Storer, error) {
 
 // GetToken retrieves the tokens.RefreshToken with an ID matching `token` from the Storer. If
 // no tokens.RefreshToken has that ID, an ErrTokenNotFound error is returned.
-func (m *Storer) GetToken(ctx context.Context, token string) (tokens.RefreshToken, error) {
+func (m *Storer) GetToken(_ context.Context, token string) (tokens.RefreshToken, error) {
 	txn := m.db.Txn(false)
 	tok, err := txn.First("token", "id", token)
 	if err != nil {
@@ -69,13 +70,17 @@ func (m *Storer) GetToken(ctx context.Context, token string) (tokens.RefreshToke
 	if tok == nil {
 		return tokens.RefreshToken{}, tokens.ErrTokenNotFound
 	}
-	return *tok.(*tokens.RefreshToken), nil
+	res, ok := tok.(*tokens.RefreshToken)
+	if !ok || res == nil {
+		return tokens.RefreshToken{}, fmt.Errorf("unexpected response type %T", tok) //nolint:goerr113 // error is logged, not handled
+	}
+	return *res, nil
 }
 
 // CreateToken inserts the passed tokens.RefreshToken into the Storer. If a tokens.RefreshToken with
 // the same ID already exists in the Storer, an ErrTokenAlreadyExists error will be
 // returned, and the tokens.RefreshToken will not be inserted.
-func (m *Storer) CreateToken(ctx context.Context, token tokens.RefreshToken) error {
+func (m *Storer) CreateToken(_ context.Context, token tokens.RefreshToken) error {
 	txn := m.db.Txn(true)
 	defer txn.Abort()
 	exists, err := txn.First("token", "id", token.ID)
@@ -95,7 +100,7 @@ func (m *Storer) CreateToken(ctx context.Context, token tokens.RefreshToken) err
 
 // UpdateTokens applies `change` to all the tokens.RefreshTokens in the Storer that match the ID,
 // ProfileID, or ClientID constraints of `change`.
-func (m *Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenChange) error {
+func (m *Storer) UpdateTokens(_ context.Context, change tokens.RefreshTokenChange) error {
 	if change.IsEmpty() {
 		return nil
 	}
@@ -129,7 +134,10 @@ func (m *Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenCha
 		if token == nil {
 			break
 		}
-		tok := *token.(*tokens.RefreshToken)
+		tok, ok := token.(*tokens.RefreshToken)
+		if !ok || tok == nil {
+			return fmt.Errorf("unexpected response type %T", tok) //nolint:goerr113 // error is logged, not handled
+		}
 		if change.ID != "" && tok.ID != change.ID {
 			continue
 		}
@@ -142,7 +150,7 @@ func (m *Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenCha
 		if change.AccountID != "" && tok.AccountID != change.AccountID {
 			continue
 		}
-		updated := tokens.ApplyChange(tok, change)
+		updated := tokens.ApplyChange(*tok, change)
 		err = txn.Insert("token", &updated)
 		if err != nil {
 			return err
@@ -154,7 +162,7 @@ func (m *Storer) UpdateTokens(ctx context.Context, change tokens.RefreshTokenCha
 
 // UseToken marks a tokens.RefreshToken as used, or returns a tokens.ErrTokenUsed
 // error if the tokens.RefreshToken was already marked used.
-func (m *Storer) UseToken(ctx context.Context, id string) error {
+func (m *Storer) UseToken(_ context.Context, id string) error {
 	txn := m.db.Txn(true)
 	defer txn.Abort()
 
@@ -165,13 +173,17 @@ func (m *Storer) UseToken(ctx context.Context, id string) error {
 	if tok == nil {
 		return tokens.ErrTokenNotFound
 	}
+	found, ok := tok.(*tokens.RefreshToken)
+	if !ok || found == nil {
+		return fmt.Errorf("unexpected response type %T", tok) //nolint:goerr113 // error is logged, not handled
+	}
 
-	if tok.(*tokens.RefreshToken).Used {
+	if found.Used {
 		return tokens.ErrTokenUsed
 	}
 
 	used := true
-	updated := tokens.ApplyChange(*tok.(*tokens.RefreshToken), tokens.RefreshTokenChange{
+	updated := tokens.ApplyChange(*found, tokens.RefreshTokenChange{
 		Used: &used,
 	})
 	err = txn.Insert("token", &updated)
@@ -188,7 +200,7 @@ func (m *Storer) UseToken(ctx context.Context, id string) error {
 // If `before` is non-empty, only tokens.RefreshTokens with a CreatedAt property that is before `before`
 // will be returned. tokens.RefreshTokens will be sorted by their CreatedAt property, with the most recent
 // coming first.
-func (m *Storer) GetTokensByProfileID(ctx context.Context, profileID string, since, before time.Time) ([]tokens.RefreshToken, error) {
+func (m *Storer) GetTokensByProfileID(_ context.Context, profileID string, since, before time.Time) ([]tokens.RefreshToken, error) {
 	txn := m.db.Txn(false)
 	defer txn.Abort()
 
@@ -203,14 +215,17 @@ func (m *Storer) GetTokensByProfileID(ctx context.Context, profileID string, sin
 		if tok == nil {
 			break
 		}
-		token := *tok.(*tokens.RefreshToken)
+		token, ok := tok.(*tokens.RefreshToken)
+		if !ok || token == nil {
+			return nil, fmt.Errorf("unexpected response type %T", tok) //nolint:goerr113 // error is logged, not handled
+		}
 		if !before.IsZero() && !token.CreatedAt.Before(before) {
 			continue
 		}
 		if !since.IsZero() && !token.CreatedAt.After(since) {
 			continue
 		}
-		toks = append(toks, token)
+		toks = append(toks, *token)
 	}
 	sort.Slice(toks, func(i, j int) bool { return toks[i].CreatedAt.After(toks[j].CreatedAt) })
 	if len(toks) > tokens.NumTokenResults {

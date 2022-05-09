@@ -203,9 +203,9 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"sql/tokens_20160227_init.sql": sqlTokens_20160227_initSql,
-	"sql/tokens_20160522_hashing.sql": sqlTokens_20160522_hashingSql,
-	"sql/tokens_20161126_jwt.sql": sqlTokens_20161126_jwtSql,
+	"sql/tokens_20160227_init.sql":       sqlTokens_20160227_initSql,
+	"sql/tokens_20160522_hashing.sql":    sqlTokens_20160522_hashingSql,
+	"sql/tokens_20161126_jwt.sql":        sqlTokens_20161126_jwtSql,
 	"sql/tokens_20220226_account_id.sql": sqlTokens_20220226_account_idSql,
 }
 
@@ -248,11 +248,12 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"sql": &bintree{nil, map[string]*bintree{
-		"tokens_20160227_init.sql": &bintree{sqlTokens_20160227_initSql, map[string]*bintree{}},
-		"tokens_20160522_hashing.sql": &bintree{sqlTokens_20160522_hashingSql, map[string]*bintree{}},
-		"tokens_20161126_jwt.sql": &bintree{sqlTokens_20161126_jwtSql, map[string]*bintree{}},
+		"tokens_20160227_init.sql":       &bintree{sqlTokens_20160227_initSql, map[string]*bintree{}},
+		"tokens_20160522_hashing.sql":    &bintree{sqlTokens_20160522_hashingSql, map[string]*bintree{}},
+		"tokens_20161126_jwt.sql":        &bintree{sqlTokens_20161126_jwtSql, map[string]*bintree{}},
 		"tokens_20220226_account_id.sql": &bintree{sqlTokens_20220226_account_idSql, map[string]*bintree{}},
 	}},
 }}
@@ -303,4 +304,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-
